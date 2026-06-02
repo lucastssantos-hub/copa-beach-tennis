@@ -34,11 +34,9 @@ export async function loadRemoteMatches() {
 }
 
 export async function saveRemoteMatches(matches) {
-  return supabaseRequest("app_state?on_conflict=id", {
-    method: "POST",
-    headers: { Prefer: "resolution=merge-duplicates" },
+  return supabaseRequest(`app_state?id=eq.${STATE_ID}`, {
+    method: "PATCH",
     body: JSON.stringify({
-      id: STATE_ID,
       data: { matches },
       updated_at: new Date().toISOString(),
     }),
