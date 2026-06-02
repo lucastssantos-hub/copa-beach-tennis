@@ -45,7 +45,7 @@ export default function App() {
 
     const timer = setTimeout(() => {
       saveRemoteMatches(matches).catch(() => {
-        toast("Não foi possível sincronizar com Supabase");
+        console.warn("Supabase sync skipped");
       });
     }, 500);
 
