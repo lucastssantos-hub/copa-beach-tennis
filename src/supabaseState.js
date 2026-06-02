@@ -7,7 +7,8 @@ export const hasSupabaseConfig = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY);
 async function supabaseRequest(path, options = {}) {
   if (!hasSupabaseConfig) return null;
 
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+  const url = `${SUPABASE_URL}/rest/v1/${path}`;
+  const requestOptions = {
     ...options,
     headers: {
       apikey: SUPABASE_ANON_KEY,
@@ -15,7 +16,11 @@ async function supabaseRequest(path, options = {}) {
       "Content-Type": "application/json",
       ...(options.headers || {}),
     },
-  });
+  };
+
+  const res = typeof fetch === "function"
+    ? await fetch(url, requestOptions)
+    : await xhrRequest(url, requestOptions);
 
   if (!res.ok) {
     throw new Error(`Supabase request failed: ${res.status}`);
@@ -23,6 +28,25 @@ async function supabaseRequest(path, options = {}) {
 
   if (res.status === 204) return null;
   return res.json();
+}
+
+function xhrRequest(url, options) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(options.method || "GET", url);
+    Object.entries(options.headers || {}).forEach(([key, value]) => {
+      xhr.setRequestHeader(key, value);
+    });
+    xhr.onload = () => {
+      resolve({
+        ok: xhr.status >= 200 && xhr.status < 300,
+        status: xhr.status,
+        json: () => JSON.parse(xhr.responseText || "null"),
+      });
+    };
+    xhr.onerror = () => reject(new Error("Supabase request failed"));
+    xhr.send(options.body || null);
+  });
 }
 
 export async function loadRemoteMatches() {
