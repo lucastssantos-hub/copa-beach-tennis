@@ -1,137 +1,122 @@
-// ============ Copa do Mundo de Beach Tennis — Mock Data ============
-// Single seeded dataset shared across roles. Captain edits flow into
-// the same objects the referee reads, so the prototype feels live.
+// ============ Copa do Mundo de Beach Tennis — tournament data ============
 
 export const FLAGS = {
-  BRA: "🇧🇷", ESP: "🇪🇸", ITA: "🇮🇹", FRA: "🇫🇷", USA: "🇺🇸",
-  POR: "🇵🇹", ARG: "🇦🇷", GER: "🇩🇪",
+  ARG: "🇦🇷", ARU: "🇦🇼", AUS: "🇦🇺", BRA: "🇧🇷", CAN: "🇨🇦",
+  CRO: "🇭🇷", ENG: "🏴", ESP: "🇪🇸", ITA: "🇮🇹", NED: "🇳🇱",
+  NOR: "🇳🇴", POR: "🇵🇹", SWE: "🇸🇪", USA: "🇺🇸",
 };
 
-// The captain role controls this team.
 export const TEAM_CODE = "BRA";
 
-// ---- Atletas por equipe (categoria Open Misto) ----
-export const TEAMS = {
-  BRA: {
-    id: "BRA", name: "Brasil", flag: FLAGS.BRA,
-    women: [
-      { id: "b-w1", name: "Sofia Almeida" },
-      { id: "b-w2", name: "Marina Costa" },
-      { id: "b-w3", name: "Júlia Ferraz" },
-    ],
-    men: [
-      { id: "b-m1", name: "Diego Ramos" },
-      { id: "b-m2", name: "Lucas Mendes" },
-      { id: "b-m3", name: "Rafael Pinto" },
+const COUNTRY_NAMES = {
+  ARG: "Argentina",
+  ARU: "Aruba",
+  AUS: "Austrália",
+  BRA: "Brasil",
+  CAN: "Canadá",
+  CRO: "Croácia",
+  ENG: "Inglaterra",
+  ESP: "Espanha",
+  ITA: "Itália",
+  NED: "Holanda",
+  NOR: "Noruega",
+  POR: "Portugal",
+  SWE: "Suécia",
+  USA: "USA",
+};
+
+function makeRoster(code) {
+  const initials = code.toLowerCase();
+  const names = {
+    BRA: {
+      women: ["Sofia Almeida", "Marina Costa", "Júlia Ferraz"],
+      men: ["Diego Ramos", "Lucas Mendes", "Rafael Pinto"],
+    },
+    ESP: { women: ["Carmen Ruiz", "Lucía Vega"], men: ["Pablo Serra", "Hugo Marín"] },
+    ITA: { women: ["Giulia Conti", "Sara Greco"], men: ["Marco Bruno", "Luca Ferri"] },
+  }[code];
+  const women = names?.women || [`${COUNTRY_NAMES[code]} F1`, `${COUNTRY_NAMES[code]} F2`];
+  const men = names?.men || [`${COUNTRY_NAMES[code]} M1`, `${COUNTRY_NAMES[code]} M2`];
+  return {
+    id: code,
+    name: COUNTRY_NAMES[code],
+    flag: FLAGS[code],
+    women: women.map((name, i) => ({ id: `${initials}-w${i + 1}`, name })),
+    men: men.map((name, i) => ({ id: `${initials}-m${i + 1}`, name })),
+  };
+}
+
+export const TEAMS = Object.keys(COUNTRY_NAMES).reduce((acc, code) => {
+  acc[code] = makeRoster(code);
+  return acc;
+}, {});
+
+export const EVENT = {
+  title: "Copa do Mundo de Beach Tennis",
+  edition: "Maceió 2026",
+  category: "Circuito de Equipes",
+};
+
+export const SCHEDULE = [
+  { day: "Quinta", date: "18/06", time: "18h00", categories: ["60+"], note: "Fase de grupos" },
+  { day: "Sexta", date: "19/06", time: "18h30", categories: ["E", "35+"], note: "Fase de grupos" },
+  { day: "Sábado", date: "20/06", time: "08h00", categories: ["D", "C"], note: "Fase de grupos" },
+  { day: "Sábado", date: "20/06", time: "16h00", categories: ["E", "35+"], note: "Eliminatórias" },
+  { day: "Domingo", date: "21/06", time: "08h00", categories: ["B", "A"], note: "Fase de grupos" },
+];
+
+export const CATEGORIES = [
+  { id: "60+", label: "60+", loaded: true, schedule: "Quinta 18/06 · 18h00" },
+  { id: "E", label: "E", loaded: true, schedule: "Sexta 19/06 · 18h30" },
+  { id: "35+", label: "35+", loaded: true, schedule: "Sexta 19/06 · 18h30" },
+  { id: "D", label: "D", loaded: false, schedule: "Sábado 20/06 · 08h00" },
+  { id: "C", label: "C", loaded: false, schedule: "Sábado 20/06 · 08h00" },
+  { id: "B", label: "B", loaded: false, schedule: "Domingo 21/06 · 08h00" },
+  { id: "A", label: "A", loaded: true, schedule: "Domingo 21/06 · 08h00" },
+];
+
+export const CATEGORY_DRAWS = {
+  A: {
+    participants: 57,
+    groups: [
+      group(1, ["POR", "ITA", "NOR"], [["NOR", "ITA"], ["POR", "NOR"], ["ITA", "POR"]]),
+      group(2, ["ARG", "AUS", "USA"], [["AUS", "USA"], ["ARG", "USA"], ["ARG", "AUS"]]),
+      group(3, ["ESP", "SWE", "NED"], [["SWE", "NED"], ["SWE", "ESP"], ["NED", "ESP"]]),
+      group(4, ["ARU", "BRA", "CRO", "CAN"], [["ARU", "CRO"], ["BRA", "ARU"], ["CAN", "BRA"], ["CRO", "CAN"], ["ARU", "CAN"], ["CRO", "BRA"]]),
     ],
   },
-  ESP: {
-    id: "ESP", name: "Espanha", flag: FLAGS.ESP,
-    women: [
-      { id: "e-w1", name: "Carmen Ruiz" },
-      { id: "e-w2", name: "Lucía Vega" },
-    ],
-    men: [
-      { id: "e-m1", name: "Pablo Serra" },
-      { id: "e-m2", name: "Hugo Marín" },
+  E: {
+    participants: 88,
+    groups: [
+      group(1, ["ITA", "ARG", "USA"], [["ITA", "USA"], ["USA", "ARG"], ["ITA", "ARG"]]),
+      group(2, ["ESP", "ENG", "POR"], [["ESP", "ENG"], ["POR", "ENG"], ["ESP", "POR"]]),
+      group(3, ["BRA", "ARU", "NOR", "CAN"], [["NOR", "BRA"], ["ARU", "CAN"], ["BRA", "CAN"], ["BRA", "ARU"], ["NOR", "CAN"], ["NOR", "ARU"]]),
+      group(4, ["SWE", "CRO", "AUS", "NED"], [["CRO", "NED"], ["NED", "SWE"], ["SWE", "AUS"], ["SWE", "CRO"], ["NED", "AUS"], ["AUS", "CRO"]]),
     ],
   },
-  ITA: {
-    id: "ITA", name: "Itália", flag: FLAGS.ITA,
-    women: [
-      { id: "i-w1", name: "Giulia Conti" },
-      { id: "i-w2", name: "Sara Greco" },
-    ],
-    men: [
-      { id: "i-m1", name: "Marco Bruno" },
-      { id: "i-m2", name: "Luca Ferri" },
+  "35+": {
+    participants: 65,
+    groups: [
+      group(1, ["CAN", "ARG", "NOR"], [["NOR", "CAN"], ["ARG", "CAN"], ["NOR", "ARG"]]),
+      group(2, ["ITA", "ARU", "BRA"], [["ITA", "BRA"], ["ARU", "ITA"], ["BRA", "ARU"]]),
+      group(3, ["ESP", "POR", "AUS"], [["POR", "AUS"], ["AUS", "ESP"], ["POR", "ESP"]]),
+      group(4, ["USA", "ENG", "SWE", "CRO"], [["SWE", "CRO"], ["ENG", "SWE"], ["ENG", "USA"], ["ENG", "CRO"], ["USA", "CRO"], ["USA", "SWE"]]),
     ],
   },
-  FRA: {
-    id: "FRA", name: "França", flag: FLAGS.FRA,
-    women: [
-      { id: "f-w1", name: "Camille Roux" },
-      { id: "f-w2", name: "Léa Moreau" },
-    ],
-    men: [
-      { id: "f-m1", name: "Théo Garnier" },
-      { id: "f-m2", name: "Hugo Lefèvre" },
+  "60+": {
+    participants: 57,
+    groups: [
+      group(1, ["AUS", "POR", "SWE"], [["POR", "AUS"], ["AUS", "SWE"], ["SWE", "POR"]]),
+      group(2, ["CRO", "NOR", "ENG"], [["CRO", "ENG"], ["NOR", "ENG"], ["NOR", "CRO"]]),
+      group(3, ["ARG", "CAN", "ITA"], [["ARG", "ITA"], ["CAN", "ITA"], ["CAN", "ARG"]]),
+      group(4, ["ARU", "BRA", "ESP", "USA"], [["USA", "BRA"], ["ESP", "ARU"], ["BRA", "ESP"], ["USA", "ESP"], ["ARU", "USA"], ["ARU", "BRA"]]),
     ],
   },
 };
 
-// ---- Status de confronto ----
-// aguardando | parcial | pronto | andamento | mista | finalizado | wo | desistencia
-// ---- Status de escalação por equipe ----
-// pendente | rascunho | enviada | validada | bloqueada
-
-// A "lineup" holds the two locked games + optional mista.
-// fem: [athleteId, athleteId], masc: [...], mista: { w, m }
-export function emptyLineup() {
-  return { status: "pendente", fem: [null, null], masc: [null, null], mista: null };
-}
-
-// Confrontos da fase de grupos — Grupo A
-export const MATCHES = [
-  {
-    id: "m1", phase: "Grupo A", court: "Quadra Central", time: "14:30",
-    a: "BRA", b: "ESP",
-    status: "parcial",
-    lineups: {
-      BRA: { status: "validada", fem: ["b-w1", "b-w2"], masc: ["b-m1", "b-m2"], mista: null },
-      ESP: { status: "enviada", fem: ["e-w1", "e-w2"], masc: ["e-m1", "e-m2"], mista: null },
-    },
-    games: { fem: null, masc: null, mista: null }, // each: {winner, score}
-  },
-  {
-    id: "m2", phase: "Grupo A", court: "Quadra 2", time: "15:15",
-    a: "ITA", b: "FRA",
-    status: "andamento",
-    lineups: {
-      ITA: { status: "validada", fem: ["i-w1", "i-w2"], masc: ["i-m1", "i-m2"], mista: null },
-      FRA: { status: "validada", fem: ["f-w1", "f-w2"], masc: ["f-m1", "f-m2"], mista: null },
-    },
-    games: { fem: { winner: "ITA", score: "6-3" }, masc: null, mista: null },
-  },
-  {
-    id: "m3", phase: "Grupo A", court: "Quadra Central", time: "16:00",
-    a: "BRA", b: "ITA",
-    status: "aguardando",
-    lineups: { BRA: emptyLineup(), ITA: emptyLineup() },
-    games: { fem: null, masc: null, mista: null },
-  },
-  {
-    id: "m4", phase: "Grupo A", court: "Quadra 2", time: "16:45",
-    a: "ESP", b: "FRA",
-    status: "aguardando",
-    lineups: { ESP: emptyLineup(), FRA: emptyLineup() },
-    games: { fem: null, masc: null, mista: null },
-  },
-  {
-    id: "m5", phase: "Grupo A", court: "Quadra Central", time: "17:30",
-    a: "BRA", b: "FRA",
-    status: "aguardando",
-    lineups: { BRA: emptyLineup(), FRA: emptyLineup() },
-    games: { fem: null, masc: null, mista: null },
-  },
-  {
-    id: "m6", phase: "Grupo A", court: "Quadra 2", time: "18:15",
-    a: "ESP", b: "ITA",
-    status: "finalizado",
-    lineups: {
-      ESP: { status: "validada", fem: ["e-w1", "e-w2"], masc: ["e-m1", "e-m2"], mista: { w: "e-w1", m: "e-m1" } },
-      ITA: { status: "validada", fem: ["i-w1", "i-w2"], masc: ["i-m1", "i-m2"], mista: { w: "i-w1", m: "i-m1" } },
-    },
-    games: {
-      fem: { winner: "ESP", score: "6-4" },
-      masc: { winner: "ITA", score: "7-5" },
-      mista: { winner: "ESP", score: "6-2" },
-    },
-  },
-];
+export const MATCHES = buildMatches();
 
 export const STATUS_META = {
-  // match statuses
   aguardando:   { label: "Aguardando escalação", tone: "muted" },
   parcial:      { label: "Escalação parcial",     tone: "warn" },
   pronto:       { label: "Pronto para chamada",   tone: "go" },
@@ -140,7 +125,6 @@ export const STATUS_META = {
   finalizado:   { label: "Finalizado",            tone: "done" },
   wo:           { label: "W.O.",                  tone: "coral" },
   desistencia:  { label: "Desistência",           tone: "coral" },
-  // lineup statuses
   pendente:     { label: "Pendente",   tone: "muted" },
   rascunho:     { label: "Rascunho",   tone: "warn" },
   enviada:      { label: "Enviada",    tone: "go" },
@@ -148,13 +132,20 @@ export const STATUS_META = {
   bloqueada:    { label: "Bloqueada",  tone: "live" },
 };
 
-export const EVENT = {
-  title: "Copa do Mundo de Beach Tennis",
-  edition: "Maceió 2026",
-  category: "Open Misto",
-};
+export function emptyLineup() {
+  return { status: "pendente", fem: [null, null], masc: [null, null], mista: null };
+}
 
-// Confronto score helper (shared by every screen).
+export function filledLineup(code, status = "enviada") {
+  const team = TEAMS[code];
+  return {
+    status,
+    fem: [team.women[0]?.id || null, team.women[1]?.id || null],
+    masc: [team.men[0]?.id || null, team.men[1]?.id || null],
+    mista: null,
+  };
+}
+
 export function confrontoScore(m) {
   let a = 0, b = 0;
   ["fem", "masc", "mista"].forEach(k => {
@@ -164,9 +155,53 @@ export function confrontoScore(m) {
   return { a, b };
 }
 
-// Resolve an athlete's display name from a team + athlete id.
 export function athleteName(code, id) {
   const t = TEAMS[code];
-  const all = [...t.women, ...t.men];
+  const all = [...(t?.women || []), ...(t?.men || [])];
   return (all.find(a => a.id === id) || {}).name || "—";
+}
+
+export function categoryMeta(categoryId) {
+  return CATEGORIES.find(c => c.id === categoryId) || CATEGORIES[0];
+}
+
+function group(number, teams, games) {
+  return { id: `Grupo ${number}`, teams, games };
+}
+
+function buildMatches() {
+  const courts = ["Quadra Central", "Quadra 2", "Quadra 3", "Quadra 4"];
+  const timesByCategory = {
+    "60+": ["18:00", "18:25", "18:50", "19:15", "19:40", "20:05"],
+    E: ["18:30", "18:55", "19:20", "19:45", "20:10", "20:35"],
+    "35+": ["18:30", "18:55", "19:20", "19:45", "20:10", "20:35"],
+    A: ["08:00", "08:25", "08:50", "09:15", "09:40", "10:05"],
+  };
+
+  const matches = [];
+  Object.entries(CATEGORY_DRAWS).forEach(([category, draw]) => {
+    let n = 1;
+    draw.groups.forEach(g => {
+      g.games.forEach(([a, b], index) => {
+        const lineups = { [a]: filledLineup(a), [b]: filledLineup(b) };
+        if (a === TEAM_CODE || b === TEAM_CODE) {
+          lineups[TEAM_CODE] = emptyLineup();
+        }
+        matches.push({
+          id: `${category.replace("+", "plus").toLowerCase()}-${n}`,
+          category,
+          phase: g.id,
+          court: courts[(n - 1) % courts.length],
+          time: timesByCategory[category]?.[index % 6] || "08:00",
+          a,
+          b,
+          status: "parcial",
+          lineups,
+          games: { fem: null, masc: null, mista: null },
+        });
+        n++;
+      });
+    });
+  });
+  return matches;
 }

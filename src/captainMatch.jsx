@@ -45,7 +45,7 @@ export function CaptainMatch({ match, onBack, onUpdate, toast }) {
 
   return (
     <div style={{ padding: "0 20px 130px" }}>
-      <AppBar onBack={onBack} subtitle={`${match.phase} · ${match.time}`} title={`Brasil vs ${TEAMS[opp].name}`} />
+      <AppBar onBack={onBack} subtitle={`Categoria ${match.category} · ${match.phase} · ${match.time}`} title={`Brasil vs ${TEAMS[opp].name}`} />
 
       {/* match meta */}
       <Card style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 16px" }}>

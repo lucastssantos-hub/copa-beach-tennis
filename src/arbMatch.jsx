@@ -179,7 +179,7 @@ export function ArbMatch({ match, onBack, onUpdate, onSetStatus, toast }) {
 
   return (
     <div style={{ padding: "0 20px 130px", position: "relative" }}>
-      <AppBar onBack={onBack} subtitle={`${match.phase} · ${match.court}`}
+      <AppBar onBack={onBack} subtitle={`Categoria ${match.category} · ${match.phase} · ${match.court}`}
         title={`${TEAMS[match.a].name} vs ${TEAMS[match.b].name}`}
         right={<StatusPill status={match.status} size="sm" />} />
 

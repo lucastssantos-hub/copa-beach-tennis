@@ -1,5 +1,5 @@
 // ============ Área do Capitão (controla a equipe Brasil) ============
-import { TEAMS, EVENT, TEAM_CODE } from "./data.js";
+import { TEAMS, TEAM_CODE } from "./data.js";
 import { Eyebrow, StatusPill, VersusRow, Button, Card, Flag, AppBar } from "./components.jsx";
 
 // Athlete selector chip-grid for a duo
@@ -40,7 +40,7 @@ export function DuoPicker({ label, pool, selected, onPick, locked, gender }) {
 }
 
 // ---------- Captain Home ----------
-export function CaptainHome({ matches, onOpenMatch }) {
+export function CaptainHome({ matches, category, onOpenMatch }) {
   const team = TEAMS[TEAM_CODE];
   const upcoming = matches.filter(m => (m.a === TEAM_CODE || m.b === TEAM_CODE) &&
     !["finalizado", "wo", "desistencia"].includes(m.status));
@@ -49,7 +49,7 @@ export function CaptainHome({ matches, onOpenMatch }) {
 
   return (
     <div style={{ padding: "0 20px 110px" }}>
-      <AppBar subtitle={EVENT.category} title={`${team.flag} ${team.name}`}
+      <AppBar subtitle={`Categoria ${category.label} · ${category.schedule}`} title={`${team.flag} ${team.name}`}
         right={<div style={{ textAlign: "right" }}>
           <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: "#8a7d63", letterSpacing: ".1em" }}>CAPITÃO</div>
           <div style={{ fontSize: 12, color: "#C9BBA0", fontWeight: 600 }}>D. Ramos</div>
@@ -87,6 +87,17 @@ export function CaptainHome({ matches, onOpenMatch }) {
                 <Button full variant="ghost" onClick={() => onOpenMatch(next.id)}>Ver escalação</Button>
               </>
             )}
+          </div>
+        </Card>
+      )}
+
+      {!next && (
+        <Card style={{ marginTop: 4, background: "rgba(255,176,46,.06)", borderColor: "rgba(255,176,46,.18)" }}>
+          <div style={{ fontFamily: "'Archivo Black',sans-serif", fontSize: 16, color: "#FBF7EE", marginBottom: 6 }}>
+            Chave ainda não carregada
+          </div>
+          <div style={{ color: "#C9BBA0", fontSize: 12.5, lineHeight: 1.45 }}>
+            Essa categoria está no cronograma, mas ainda precisa do PDF de confrontos para aparecer na operação.
           </div>
         </Card>
       )}

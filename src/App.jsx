@@ -1,6 +1,6 @@
 // ============ Root App — role switch + routing + shared state ============
 import { useEffect, useState } from "react";
-import { MATCHES } from "./data.js";
+import { CATEGORIES, MATCHES, SCHEDULE, categoryMeta } from "./data.js";
 import { hasSupabaseConfig, loadRemoteMatches, saveRemoteMatches } from "./supabaseState.js";
 import { AppBar, Card, Toast } from "./components.jsx";
 import { CaptainHome } from "./captainHome.jsx";
@@ -14,6 +14,7 @@ export default function App() {
   const [matches, setMatches] = useState(loadMatches);
   const [tab, setTab] = useState("home");
   const [openId, setOpenId] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState("60+");
   const [toastMsg, setToastMsg] = useState("");
   const [syncReady, setSyncReady] = useState(!hasSupabaseConfig);
   const toast = m => setToastMsg(m);
@@ -24,7 +25,7 @@ export default function App() {
     let active = true;
     loadRemoteMatches()
       .then(remoteMatches => {
-        if (active && remoteMatches) setMatches(remoteMatches.map(normalizeMatch));
+        if (active && isValidMatchSet(remoteMatches)) setMatches(remoteMatches.map(normalizeMatch));
       })
       .catch(() => {
         if (active) toast("Supabase indisponível. Usando dados locais");
@@ -71,13 +72,20 @@ export default function App() {
     localStorage.removeItem(STORAGE_KEY);
     setMatches(cloneSeed());
     setOpenId(null);
+    setSelectedCategory("60+");
     setTab(role === "capitao" ? "home" : "jogos");
     toast("Dados restaurados");
   }
 
   const openMatch = matches.find(m => m.id === openId);
+  const visibleMatches = matches.filter(m => m.category === selectedCategory);
+  const activeCategory = categoryMeta(selectedCategory);
 
   function switchRole(r) { setRole(r); setOpenId(null); setTab(r === "capitao" ? "home" : "jogos"); }
+  function switchCategory(categoryId) {
+    setSelectedCategory(categoryId);
+    setOpenId(null);
+  }
 
   // ---- screen routing ----
   let screen;
@@ -87,12 +95,12 @@ export default function App() {
       : <ArbMatch match={openMatch} onBack={() => setOpenId(null)} onUpdate={updateLineup} onSetStatus={setStatus} toast={toast} />;
   } else if (role === "capitao") {
     screen = tab === "home"
-      ? <CaptainHome matches={matches} onOpenMatch={setOpenId} />
-      : <CaptainHistory matches={matches} />;
+      ? <CaptainHome matches={visibleMatches} category={activeCategory} onOpenMatch={setOpenId} />
+      : <CaptainHistory matches={visibleMatches} category={activeCategory} />;
   } else {
     screen = tab === "jogos"
-      ? <ArbDashboard matches={matches} onOpenMatch={setOpenId} />
-      : <ArbClassif matches={matches} />;
+      ? <ArbDashboard matches={visibleMatches} category={activeCategory} onOpenMatch={setOpenId} />
+      : <ArbClassif matches={visibleMatches} category={activeCategory} />;
   }
 
   const navItems = role === "capitao"
@@ -121,8 +129,15 @@ export default function App() {
           </div>
         </div>
 
+        {!openMatch && (
+          <>
+            <CategoryPicker selected={selectedCategory} onSelect={switchCategory} />
+            <ScheduleStrip selected={selectedCategory} />
+          </>
+        )}
+
         {/* scroll area */}
-        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", paddingTop: 4 }} key={role + tab + (openId || "")}>
+        <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", paddingTop: 4 }} key={role + tab + selectedCategory + (openId || "")}>
           <div style={{ animation: "fadeIn .3s ease" }}>{screen}</div>
         </div>
 
@@ -157,10 +172,10 @@ export default function App() {
   );
 }
 
-const STORAGE_KEY = "copa-beach-tennis-state-v1";
+const STORAGE_KEY = "copa-beach-tennis-state-v2";
 
 function cloneSeed() {
-  return JSON.parse(JSON.stringify(MATCHES));
+  return JSON.parse(JSON.stringify(MATCHES)).map(normalizeMatch);
 }
 
 function loadMatches() {
@@ -168,10 +183,14 @@ function loadMatches() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return cloneSeed();
     const parsed = JSON.parse(saved);
-    return Array.isArray(parsed) ? parsed.map(normalizeMatch) : cloneSeed();
+    return isValidMatchSet(parsed) ? parsed.map(normalizeMatch) : cloneSeed();
   } catch {
     return cloneSeed();
   }
+}
+
+function isValidMatchSet(value) {
+  return Array.isArray(value) && value.length > 0 && value.every(m => m.category && m.id);
 }
 
 function normalizeMatch(match) {
@@ -184,19 +203,57 @@ function normalizeMatch(match) {
   return { ...match, status: "aguardando" };
 }
 
+function CategoryPicker({ selected, onSelect }) {
+  return (
+    <div style={{ display: "flex", gap: 7, overflowX: "auto", padding: "12px 16px 2px", flexShrink: 0 }}>
+      {CATEGORIES.map(c => {
+        const active = selected === c.id;
+        return (
+          <button key={c.id} onClick={() => onSelect(c.id)} style={{ flexShrink: 0, minWidth: 54,
+            padding: "9px 12px", borderRadius: 999, border: active ? "1.5px solid #FF5A4E" : "1px solid rgba(242,228,201,.12)",
+            background: active ? "rgba(255,90,78,.18)" : "rgba(242,228,201,.05)",
+            color: active ? "#FBF7EE" : c.loaded ? "#C9BBA0" : "#6f6387",
+            fontFamily: "'Archivo',sans-serif", fontSize: 13, fontWeight: 800, cursor: "pointer" }}>
+            {c.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function ScheduleStrip({ selected }) {
+  const rows = SCHEDULE.filter(s => s.categories.includes(selected));
+  return (
+    <div style={{ padding: "7px 16px 2px", flexShrink: 0 }}>
+      {rows.map(row => (
+        <div key={`${row.day}-${row.time}-${row.categories.join("-")}`} style={{ display: "flex", alignItems: "center", gap: 10,
+          padding: "10px 12px", borderRadius: 13, background: "rgba(14,5,24,.42)",
+          border: "1px solid rgba(242,228,201,.1)" }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontFamily: "'JetBrains Mono',monospace", color: "#9B6BFF", fontSize: 10, letterSpacing: ".08em" }}>{row.note}</div>
+            <div style={{ color: "#FBF7EE", fontSize: 12.5, fontWeight: 800, marginTop: 2 }}>{row.day} · {row.date}</div>
+          </div>
+          <div style={{ fontFamily: "'Archivo Black',sans-serif", color: "#FF5A4E", fontSize: 18 }}>{row.time}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Arbitragem classificação screen
-function ArbClassif({ matches }) {
-  const groups = ["Grupo A"];
+function ArbClassif({ matches, category }) {
+  const groups = [...new Set(matches.map(m => m.phase))];
   return (
     <div style={{ padding: "0 20px 110px" }}>
-      <AppBar subtitle="Fase de grupos" title="Classificação" />
+      <AppBar subtitle={category.schedule} title={`Classificação ${category.label}`} />
       {groups.map(g => (
         <div key={g} style={{ marginBottom: 24 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
             <span style={{ fontFamily: "'Archivo Black',sans-serif", fontSize: 15, color: "#FBF7EE" }}>{g}</span>
             <span style={{ flex: 1, height: 1, background: "rgba(242,228,201,.1)" }} />
           </div>
-          <Classificacao matches={matches} />
+          <Classificacao matches={matches} group={g} />
         </div>
       ))}
       <Card style={{ background: "rgba(255,176,46,.06)", borderColor: "rgba(255,176,46,.2)" }}>

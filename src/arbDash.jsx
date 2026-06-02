@@ -3,7 +3,7 @@ import { useState } from "react";
 import { EVENT, TEAMS, STATUS_META, confrontoScore } from "./data.js";
 import { Card, StatusPill, Flag, AppBar } from "./components.jsx";
 
-export function ArbDashboard({ matches, onOpenMatch }) {
+export function ArbDashboard({ matches, category, onOpenMatch }) {
   const count = st => matches.filter(m => m.status === st).length;
   const pendingLineups = matches.filter(m =>
     Object.values(m.lineups).some(l => ["pendente", "rascunho"].includes(l.status)) &&
@@ -32,13 +32,19 @@ export function ArbDashboard({ matches, onOpenMatch }) {
 
   return (
     <div style={{ padding: "0 20px 110px" }}>
-      <AppBar subtitle={`${EVENT.edition} · ${EVENT.category}`} title="Arbitragem Geral"
+      <AppBar subtitle={`${EVENT.edition} · Categoria ${category.label}`} title="Arbitragem Geral"
         right={<div style={{ textAlign: "right" }}>
           <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: "#8a7d63", letterSpacing: ".1em" }}>ÁRBITRO</div>
           <div style={{ fontSize: 12, color: "#C9BBA0", fontWeight: 600 }}>Geral</div>
         </div>} />
 
       {/* Overview cards */}
+      <div style={{ marginBottom: 10, padding: "10px 12px", borderRadius: 12,
+        background: "rgba(107,47,217,.12)", border: "1px solid rgba(155,107,255,.18)",
+        color: "#C9BBA0", fontSize: 12.5, fontWeight: 700 }}>
+        {category.schedule}
+      </div>
+
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
         {cards.map(c => (
           <div key={c.label} style={{ background: c.bg, border: "1px solid rgba(242,228,201,.08)",
@@ -61,6 +67,14 @@ export function ArbDashboard({ matches, onOpenMatch }) {
 
       {/* Match list */}
       <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 16 }}>
+        {shown.length === 0 && (
+          <Card style={{ background: "rgba(255,176,46,.06)", borderColor: "rgba(255,176,46,.18)" }}>
+            <div style={{ fontSize: 13, color: "#FFC766", fontWeight: 800, marginBottom: 4 }}>Chave pendente</div>
+            <div style={{ fontSize: 12.5, color: "#C9BBA0", lineHeight: 1.45 }}>
+              Categoria no cronograma, aguardando importação do PDF de confrontos.
+            </div>
+          </Card>
+        )}
         {shown.map(m => <ArbMatchRow key={m.id} match={m} onClick={() => onOpenMatch(m.id)} />)}
       </div>
     </div>

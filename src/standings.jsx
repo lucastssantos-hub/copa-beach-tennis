@@ -31,8 +31,8 @@ export function computeStandings(matches, group = "Grupo A") {
     y.v - x.v || y.sv - x.sv || (y.games - y.gc) - (x.games - x.gc) || y.games - x.games);
 }
 
-export function Classificacao({ matches, highlight }) {
-  const rows = computeStandings(matches);
+export function Classificacao({ matches, highlight, group = "Grupo 1" }) {
+  const rows = computeStandings(matches, group);
   return (
     <div>
       <div style={{ display: "grid", gridTemplateColumns: "26px 1fr 30px 30px 38px 42px",
@@ -76,7 +76,7 @@ export function Classificacao({ matches, highlight }) {
 }
 
 // ---------- Captain History ----------
-export function CaptainHistory({ matches }) {
+export function CaptainHistory({ matches, category }) {
   const me = TEAM_CODE;
   const mine = matches.filter(m => (m.a === me || m.b === me));
   const played = mine.filter(m => ["finalizado", "wo", "desistencia"].includes(m.status));
@@ -84,7 +84,7 @@ export function CaptainHistory({ matches }) {
 
   return (
     <div style={{ padding: "0 20px 110px" }}>
-      <AppBar subtitle="Brasil · Open Misto" title="Histórico & Classificação" />
+      <AppBar subtitle={`Brasil · Categoria ${category.label}`} title="Histórico & Classificação" />
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 22 }}>
         {[["Jogados", played.length], ["Vitórias", wins], ["Pontos", wins * 3]].map(([l, v]) => (
@@ -95,10 +95,14 @@ export function CaptainHistory({ matches }) {
         ))}
       </div>
 
-      <Eyebrow>Classificação · Grupo A</Eyebrow>
-      <div style={{ marginTop: 12, marginBottom: 24 }}>
-        <Classificacao matches={matches} highlight={me} />
-      </div>
+      {[...new Set(matches.map(m => m.phase))].map(group => (
+        <div key={group} style={{ marginBottom: 24 }}>
+          <Eyebrow>Classificação · {group}</Eyebrow>
+          <div style={{ marginTop: 12 }}>
+            <Classificacao matches={matches} highlight={me} group={group} />
+          </div>
+        </div>
+      ))}
 
       <Eyebrow>Confrontos anteriores</Eyebrow>
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
