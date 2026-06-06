@@ -58,7 +58,7 @@ export function CaptainMatch({ match, onBack, dispatch, toast, me }) {
       {/* match meta */}
       <Card style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 16px" }}>
         <div style={{ display: "flex", gap: 14, fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: "#C9BBA0" }}>
-          <span>◇ {match.court}</span><span>◷ {match.time}</span>
+          {match.court && <span>◇ {match.court}</span>}<span>◷ {match.time}</span>
         </div>
         <StatusPill status={match.status} size="sm" />
       </Card>

@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { TEAMS, confrontoScore } from "./data.js";
 import {
-  STATUS, courtsFromMatches, kpisFromMatches, isTerminal, isLive,
+  STATUS, courtsFromMatches, courtNames, kpisFromMatches, isTerminal, isLive,
   releaseCourt, warmupToPlay, validateResult, resolveContest, markWalkover,
 } from "./engine.js";
 import { AppBar, Card, Eyebrow, Button, Flag, StatusPill, Countdown } from "./components.jsx";
@@ -14,27 +14,100 @@ import { Scoreboard, GameRow, ArbLineupCol } from "./arbMatch.jsx";
 
 const PENDING = [STATUS.AGUARDANDO_QUADRA, STATUS.AGUARDANDO_RESULTADO, STATUS.RESULTADO_CONTESTADO];
 
+// Conjunto de quadras atualmente ocupadas (AQUECIMENTO ou EM_JOGO) em todos os matches
+function occupiedSet(allMatches) {
+  return new Set(
+    allMatches
+      .filter(m => m.status === STATUS.AQUECIMENTO || isLive(m.status))
+      .map(m => m.court)
+      .filter(Boolean)
+  );
+}
+
+// Picker inline de quadra — mostra N slots, ocupados desativados
+function CourtPicker({ courtCount, allMatches, onPick, onCancel }) {
+  const occupied = occupiedSet(allMatches);
+  const names = courtNames(courtCount);
+  return (
+    <div style={{ marginTop: 10 }}>
+      <div style={{ fontSize: 11.5, color: "#C9BBA0", fontWeight: 700, marginBottom: 8, letterSpacing: ".04em" }}>ESCOLHA A QUADRA</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 7 }}>
+        {names.map(name => {
+          const busy = occupied.has(name);
+          return (
+            <button key={name} disabled={busy} onClick={() => !busy && onPick(name)} style={{
+              padding: "9px 14px", borderRadius: 10, cursor: busy ? "default" : "pointer",
+              background: busy ? "rgba(242,228,201,.04)" : "rgba(107,47,217,.18)",
+              border: `1px solid ${busy ? "rgba(242,228,201,.1)" : "#9B6BFF"}`,
+              color: busy ? "#6f6387" : "#C9A9FF",
+              fontSize: 12.5, fontWeight: 700, lineHeight: 1.3, textAlign: "center",
+            }}>
+              {name}
+              {busy && <span style={{ display: "block", fontSize: 10, color: "#5a4f78" }}>Em uso</span>}
+            </button>
+          );
+        })}
+      </div>
+      <button onClick={onCancel} style={{ marginTop: 10, fontSize: 12, color: "#8a7d63", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+        Cancelar
+      </button>
+    </div>
+  );
+}
+
 // ---------- Centro de Operações ----------
-export function CentroOperacoes({ matches, category, onOpenMatch, dispatch, toast }) {
-  const courts = courtsFromMatches(matches);
+export function CentroOperacoes({ matches, category, onOpenMatch, dispatch, toast, courtCount = 4, setCourtCount, allMatches = [] }) {
+  const [pickingFor, setPickingFor] = useState(null); // match ID aguardando escolha de quadra
+  const [showSettings, setShowSettings] = useState(false);
+
+  const courts = courtsFromMatches(allMatches, courtCount);
   const pending = matches
     .filter(m => PENDING.includes(m.status))
     .sort((a, b) => PENDING.indexOf(a.status) - PENDING.indexOf(b.status) || a.time.localeCompare(b.time));
 
-  function quickAction(m) {
-    if (m.status === STATUS.AGUARDANDO_QUADRA) { dispatch(releaseCourt(m, { actor: "admin" })); toast(`Quadra liberada · aquecimento 6:00`); }
-    else if (m.status === STATUS.AGUARDANDO_RESULTADO) { dispatch(validateResult(m, { actor: "admin" })); toast("Resultado validado — classificação atualizada"); }
-    else onOpenMatch(m.id);
+  function handleRelease(m, courtName) {
+    dispatch(releaseCourt(m, { actor: "admin", court: courtName }));
+    toast(`${courtName} liberada · aquecimento 6:00`);
+    setPickingFor(null);
   }
+
   const actionLabel = s => ({
-    [STATUS.AGUARDANDO_QUADRA]: "Liberar quadra",
     [STATUS.AGUARDANDO_RESULTADO]: "Validar resultado",
     [STATUS.RESULTADO_CONTESTADO]: "Resolver contestação",
   }[s]);
 
   return (
     <div style={{ padding: "0 20px 110px" }}>
-      <AppBar subtitle={`Organização · Categoria ${category.label}`} title="Centro de Operações" />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 2 }}>
+        <AppBar subtitle={`Organização · Categoria ${category.label}`} title="Centro de Operações" />
+        <button onClick={() => setShowSettings(s => !s)} title="Configurar quadras" style={{
+          width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+          background: showSettings ? "rgba(155,107,255,.22)" : "rgba(242,228,201,.07)",
+          border: `1px solid ${showSettings ? "#9B6BFF" : "rgba(242,228,201,.14)"}`,
+          color: showSettings ? "#C9A9FF" : "#8a7d63", fontSize: 16, cursor: "pointer",
+        }}>⚙</button>
+      </div>
+
+      {/* Configuração de número de quadras */}
+      {showSettings && (
+        <Card style={{ marginBottom: 16, padding: "14px 16px", background: "rgba(107,47,217,.08)", borderColor: "rgba(107,47,217,.3)" }}>
+          <Eyebrow>Quadras do evento</Eyebrow>
+          <div style={{ display: "flex", alignItems: "center", gap: 14, marginTop: 10 }}>
+            <button onClick={() => setCourtCount(c => Math.max(1, c - 1))} disabled={courtCount <= 1} style={{
+              width: 36, height: 36, borderRadius: 9, fontSize: 20, fontWeight: 800,
+              background: "rgba(242,228,201,.08)", border: "1px solid rgba(242,228,201,.18)",
+              color: courtCount <= 1 ? "#5a4f78" : "#FBF7EE", cursor: courtCount <= 1 ? "default" : "pointer",
+            }}>−</button>
+            <span style={{ fontFamily: "'Archivo Black',sans-serif", fontSize: 28, color: "#FBF7EE", minWidth: 36, textAlign: "center", lineHeight: 1 }}>{courtCount}</span>
+            <button onClick={() => setCourtCount(c => Math.min(8, c + 1))} disabled={courtCount >= 8} style={{
+              width: 36, height: 36, borderRadius: 9, fontSize: 20, fontWeight: 800,
+              background: "rgba(242,228,201,.08)", border: "1px solid rgba(242,228,201,.18)",
+              color: courtCount >= 8 ? "#5a4f78" : "#FBF7EE", cursor: courtCount >= 8 ? "default" : "pointer",
+            }}>+</button>
+            <span style={{ fontSize: 12.5, color: "#C9BBA0" }}>quadra{courtCount !== 1 ? "s" : ""} disponíve{courtCount !== 1 ? "is" : "l"}</span>
+          </div>
+        </Card>
+      )}
 
       <Eyebrow>Quadras ao vivo</Eyebrow>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginTop: 12, marginBottom: 22 }}>
@@ -62,9 +135,7 @@ export function CentroOperacoes({ matches, category, onOpenMatch, dispatch, toas
                     {confrontoScore(m).a} × {confrontoScore(m).b}</div>}
                 </>
               ) : (
-                <div style={{ fontSize: 12, color: "#6f6387", fontWeight: 700, paddingTop: 4, lineHeight: 1.35 }}>
-                  {c.next ? <>Próximo · {c.next.time}<br />{TEAMS[c.next.a].name} × {TEAMS[c.next.b].name}</> : "Livre"}
-                </div>
+                <div style={{ fontSize: 12, color: "#6f6387", fontWeight: 700, paddingTop: 4, lineHeight: 1.35 }}>Livre</div>
               )}
             </Card>
           );
@@ -77,7 +148,9 @@ export function CentroOperacoes({ matches, category, onOpenMatch, dispatch, toas
         {pending.map(m => (
           <Card key={m.id} style={{ padding: "12px 14px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 9 }}>
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: "#8a7d63" }}>◇ {m.court} · {m.phase}</span>
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: "#8a7d63" }}>
+                {m.court ? `◇ ${m.court} · ` : ""}{m.phase}
+              </span>
               <StatusPill status={m.status} size="sm" />
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 11 }}>
@@ -85,12 +158,26 @@ export function CentroOperacoes({ matches, category, onOpenMatch, dispatch, toas
               <span style={{ color: "#6B2FD9", fontWeight: 800 }}>×</span>
               <span style={{ fontWeight: 700, color: "#FBF7EE", fontSize: 13.5 }}>{TEAMS[m.b].name}</span><Flag code={m.b} size={17} />
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <Button full variant={m.status === STATUS.RESULTADO_CONTESTADO ? "danger" : "primary"} onClick={() => quickAction(m)}>
-                {actionLabel(m.status)}
-              </Button>
-              <Button variant="ghost" onClick={() => onOpenMatch(m.id)}>Detalhe</Button>
-            </div>
+
+            {/* Picker de quadra inline para AGUARDANDO_QUADRA */}
+            {m.status === STATUS.AGUARDANDO_QUADRA && pickingFor === m.id ? (
+              <CourtPicker courtCount={courtCount} allMatches={allMatches}
+                onPick={name => handleRelease(m, name)}
+                onCancel={() => setPickingFor(null)} />
+            ) : (
+              <div style={{ display: "flex", gap: 8 }}>
+                <Button full
+                  variant={m.status === STATUS.RESULTADO_CONTESTADO ? "danger" : "primary"}
+                  onClick={() => {
+                    if (m.status === STATUS.AGUARDANDO_QUADRA) { setPickingFor(m.id); }
+                    else if (m.status === STATUS.AGUARDANDO_RESULTADO) { dispatch(validateResult(m, { actor: "admin" })); toast("Resultado validado — classificação atualizada"); }
+                    else onOpenMatch(m.id);
+                  }}>
+                  {m.status === STATUS.AGUARDANDO_QUADRA ? "Liberar quadra" : actionLabel(m.status)}
+                </Button>
+                <Button variant="ghost" onClick={() => onOpenMatch(m.id)}>Detalhe</Button>
+              </div>
+            )}
           </Card>
         ))}
       </div>
@@ -99,8 +186,8 @@ export function CentroOperacoes({ matches, category, onOpenMatch, dispatch, toas
 }
 
 // ---------- Dashboard (KPIs) ----------
-export function AdminDashboard({ matches, category, categories }) {
-  const k = kpisFromMatches(matches, categories);
+export function AdminDashboard({ matches, category, categories, courtCount = 4 }) {
+  const k = kpisFromMatches(matches, courtCount, categories);
   const cards = [
     { label: "Jogos do dia", value: k.jogosDia, tone: "#C9A9FF", bg: "rgba(107,47,217,.16)" },
     { label: "Em andamento", value: k.emAndamento, tone: "#9B6BFF", bg: "rgba(107,47,217,.14)" },
@@ -129,14 +216,15 @@ export function AdminDashboard({ matches, category, categories }) {
 }
 
 // ---------- Detalhe do confronto (ADM) ----------
-export function AdminMatch({ match, onBack, dispatch, toast }) {
+export function AdminMatch({ match, onBack, dispatch, toast, courtCount = 4, allMatches = [] }) {
   const [woKind, setWoKind] = useState(null); // 'WO' | 'DESISTENCIA'
+  const [pickingCourt, setPickingCourt] = useState(false);
   const a = match.a, b = match.b;
   const done = isTerminal(match.status);
 
   return (
     <div style={{ padding: "0 20px 130px", position: "relative" }}>
-      <AppBar onBack={onBack} subtitle={`Organização · ${match.court} · ${match.phase}`}
+      <AppBar onBack={onBack} subtitle={`Organização · ${match.court || "Quadra a definir"} · ${match.phase}`}
         title={`${TEAMS[a].name} vs ${TEAMS[b].name}`} right={<StatusPill status={match.status} size="sm" />} />
 
       <Scoreboard match={match} />
@@ -180,10 +268,15 @@ export function AdminMatch({ match, onBack, dispatch, toast }) {
         <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 10 }}>
           <Eyebrow>Ações da Organização</Eyebrow>
 
-          {match.status === STATUS.AGUARDANDO_QUADRA && (
-            <Button full onClick={() => { dispatch(releaseCourt(match, { actor: "admin" })); toast("Quadra liberada · aquecimento 6:00"); }}>
-              ◇ Liberar quadra (inicia aquecimento)
-            </Button>
+          {match.status === STATUS.AGUARDANDO_QUADRA && !pickingCourt && (
+            <Button full onClick={() => setPickingCourt(true)}>◇ Liberar quadra (inicia aquecimento)</Button>
+          )}
+          {match.status === STATUS.AGUARDANDO_QUADRA && pickingCourt && (
+            <Card style={{ padding: "14px 16px", background: "rgba(107,47,217,.08)", borderColor: "rgba(107,47,217,.3)" }}>
+              <CourtPicker courtCount={courtCount} allMatches={allMatches}
+                onPick={name => { dispatch(releaseCourt(match, { actor: "admin", court: name })); toast(`${name} liberada · aquecimento 6:00`); setPickingCourt(false); }}
+                onCancel={() => setPickingCourt(false)} />
+            </Card>
           )}
           {match.status === STATUS.AQUECIMENTO && (
             <Card style={{ padding: "14px 16px", textAlign: "center", background: "rgba(255,138,46,.08)", borderColor: "rgba(255,138,46,.28)" }}>

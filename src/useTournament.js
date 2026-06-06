@@ -21,12 +21,12 @@ function isValidMatchSet(value) {
 function loadState() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return { matches: cloneSeed(), notifications: [], audits: [] };
+    if (!saved) return { matches: cloneSeed(), notifications: [], audits: [], courtCount: 4 };
     const parsed = JSON.parse(saved);
     const matches = isValidMatchSet(parsed.matches) ? parsed.matches.map(normalizeMatch) : cloneSeed();
-    return { matches, notifications: parsed.notifications || [], audits: parsed.audits || [] };
+    return { matches, notifications: parsed.notifications || [], audits: parsed.audits || [], courtCount: parsed.courtCount || 4 };
   } catch {
-    return { matches: cloneSeed(), notifications: [], audits: [] };
+    return { matches: cloneSeed(), notifications: [], audits: [], courtCount: 4 };
   }
 }
 
@@ -35,6 +35,7 @@ export function useTournament({ manageWarmup = false } = {}) {
   const [matches, setMatches] = useState(init.matches);
   const [notifications, setNotifications] = useState(init.notifications);
   const [audits, setAudits] = useState(init.audits);
+  const [courtCount, setCourtCount] = useState(init.courtCount);
   const [syncReady, setSyncReady] = useState(!hasSupabaseConfig);
   // JSON dos matches que já estão em sincronia com o Supabase (anti-eco do polling)
   const lastSyncedRef = useRef(null);
@@ -52,6 +53,7 @@ export function useTournament({ manageWarmup = false } = {}) {
     setMatches(cloneSeed());
     setNotifications([]);
     setAudits([]);
+    setCourtCount(4);
   }
 
   // Supabase (carregamento inicial dos confrontos)
@@ -90,7 +92,7 @@ export function useTournament({ manageWarmup = false } = {}) {
 
   // Persistência local
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ matches, notifications, audits }));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ matches, notifications, audits, courtCount }));
   }, [matches, notifications, audits]);
 
   useEffect(() => {
@@ -133,5 +135,5 @@ export function useTournament({ manageWarmup = false } = {}) {
     return () => clearInterval(t);
   }, [manageWarmup]);
 
-  return { matches, notifications, audits, dispatch, reset, setMatches, setNotifications };
+  return { matches, notifications, audits, dispatch, reset, setMatches, setNotifications, courtCount, setCourtCount };
 }

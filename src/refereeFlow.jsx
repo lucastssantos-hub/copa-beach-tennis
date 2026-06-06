@@ -62,7 +62,7 @@ export function RefereeQueue({ matches, category, onOpenMatch }) {
         {actionable.map(m => (
           <Card key={m.id} onClick={() => onOpenMatch(m.id)} style={{ padding: "13px 15px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: "#8a7d63" }}>◇ {m.court} · ◷ {m.time}</span>
+              <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: "#8a7d63" }}>{m.court ? `◇ ${m.court} · ` : ""}◷ {m.time}</span>
               <StatusPill status={m.status} size="sm" />
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -108,7 +108,7 @@ export function RefereeMatch({ match, onBack, dispatch, toast }) {
 
   return (
     <div style={{ padding: "0 20px 130px", position: "relative" }}>
-      <AppBar onBack={onBack} subtitle={`Mesário · ${match.court}`}
+      <AppBar onBack={onBack} subtitle={`Mesário${match.court ? ` · ${match.court}` : ""}`}
         title={`${TEAMS[a].name} vs ${TEAMS[b].name}`} right={<StatusPill status={match.status} size="sm" />} />
 
       <Scoreboard match={match} />

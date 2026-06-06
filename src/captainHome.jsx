@@ -75,7 +75,7 @@ export function CaptainHome({ matches, category, onOpenMatch, me }) {
                 <Flag code={opp} size={20} />
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 800, color: "#FBF7EE" }}>vs {TEAMS[opp].name}</div>
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: "#C9BBA0", marginTop: 2 }}>◇ {active.court} · {active.phase}</div>
+                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: "#C9BBA0", marginTop: 2 }}>{active.court ? `◇ ${active.court} · ` : ""}{active.phase}</div>
                 </div>
               </div>
               {active.status === STATUS.AQUECIMENTO && active.warmupEndsAt
@@ -97,7 +97,7 @@ export function CaptainHome({ matches, category, onOpenMatch, me }) {
             </div>
             <VersusRow a={next.a} b={next.b} />
             <div style={{ display: "flex", gap: 16, marginTop: 16, fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: "#E0CFFF" }}>
-              <span>◷ {next.time}</span><span>◇ {next.court}</span><span>{next.phase}</span>
+              <span>◷ {next.time}</span>{next.court && <span>◇ {next.court}</span>}<span>{next.phase}</span>
             </div>
           </div>
           <div style={{ padding: 16 }}>

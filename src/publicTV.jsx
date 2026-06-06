@@ -49,7 +49,7 @@ export function PublicTV({ matches, category }) {
                 <div key={m.id} style={{ background: "linear-gradient(135deg, rgba(107,47,217,.28), rgba(58,14,122,.12))",
                   border: "1px solid rgba(155,107,255,.3)", borderRadius: 18, padding: "clamp(12px,1.4vw,22px)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
-                    <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#C9A9FF", fontSize: "clamp(11px,.95vw,15px)" }}>◇ {m.court} · {m.phase}</span>
+                    <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#C9A9FF", fontSize: "clamp(11px,.95vw,15px)" }}>{m.court ? `◇ ${m.court} · ` : ""}{m.phase}</span>
                     {m.status === STATUS.AQUECIMENTO && m.warmupEndsAt
                       ? <Countdown endsAt={m.warmupEndsAt} size={20} />
                       : <StatusPill status={m.status} size="sm" />}
@@ -75,7 +75,7 @@ export function PublicTV({ matches, category }) {
               <Row key={m.id}>
                 <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#FFB36B", fontSize: "clamp(13px,1.1vw,18px)", fontWeight: 700, minWidth: 52 }}>{m.time}</span>
                 <MiniVs a={m.a} b={m.b} />
-                <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#8a7d63", fontSize: "clamp(10px,.85vw,13px)" }}>{m.court}</span>
+                {m.court && <span style={{ fontFamily: "'JetBrains Mono',monospace", color: "#8a7d63", fontSize: "clamp(10px,.85vw,13px)" }}>{m.court}</span>}
               </Row>
             ))}
           </Section>

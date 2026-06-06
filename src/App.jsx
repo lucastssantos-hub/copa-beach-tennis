@@ -20,7 +20,7 @@ const ROLE_ACCENT = Object.fromEntries(ROLES.map(([k, , c]) => [k, c]));
 const DEFAULT_TAB = { admin: "ops", arbitro: "quadras", publico: "tv" };
 
 export default function App() {
-  const { matches, notifications, audits, dispatch, reset, setNotifications } = useTournament({ manageWarmup: true });
+  const { matches, notifications, audits, dispatch, reset, setNotifications, courtCount, setCourtCount } = useTournament({ manageWarmup: true });
   const [role, setRole] = useState("admin");
   const [tab, setTab] = useState(DEFAULT_TAB.admin);
   const [openId, setOpenId] = useState(null);
@@ -66,14 +66,14 @@ export default function App() {
   if (openMatch && role === "arbitro") {
     screen = <RefereeMatch match={openMatch} onBack={() => setOpenId(null)} dispatch={dispatch} toast={toast} />;
   } else if (openMatch && role === "admin") {
-    screen = <AdminMatch match={openMatch} onBack={() => setOpenId(null)} dispatch={dispatch} toast={toast} />;
+    screen = <AdminMatch match={openMatch} onBack={() => setOpenId(null)} dispatch={dispatch} toast={toast} courtCount={courtCount} allMatches={matches} />;
   } else if (role === "arbitro") {
     screen = tab === "quadras"
       ? <RefereeQueue matches={visibleMatches} category={activeCategory} onOpenMatch={setOpenId} />
       : <ArbClassif matches={visibleMatches} category={activeCategory} />;
   } else { // admin
-    if (tab === "ops") screen = <CentroOperacoes matches={visibleMatches} category={activeCategory} onOpenMatch={setOpenId} dispatch={dispatch} toast={toast} />;
-    else if (tab === "painel") screen = <AdminDashboard matches={visibleMatches} category={activeCategory} categories={CATEGORIES} />;
+    if (tab === "ops") screen = <CentroOperacoes matches={visibleMatches} category={activeCategory} onOpenMatch={setOpenId} dispatch={dispatch} toast={toast} courtCount={courtCount} setCourtCount={setCourtCount} allMatches={matches} />;
+    else if (tab === "painel") screen = <AdminDashboard matches={visibleMatches} category={activeCategory} categories={CATEGORIES} courtCount={courtCount} />;
     else if (tab === "notif") screen = <NotificationsScreen notifications={[...roleNotifications].reverse()} onMarkAllRead={markRoleNotificationsRead} />;
     else screen = <AuditScreen audits={audits} />;
   }

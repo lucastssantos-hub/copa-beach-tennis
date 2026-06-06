@@ -166,7 +166,6 @@ function group(number, teams, games) {
 }
 
 function buildMatches() {
-  const courts = ["Quadra Central", "Quadra 2", "Quadra 3", "Quadra 4"];
   const timesByCategory = {
     "60+": ["18:00", "18:25", "18:50", "19:15", "19:40", "20:05"],
     E: ["18:30", "18:55", "19:20", "19:45", "20:10", "20:35"],
@@ -187,7 +186,7 @@ function buildMatches() {
           id: `${category.replace("+", "plus").toLowerCase()}-${n}`,
           category,
           phase: g.id,
-          court: courts[(n - 1) % courts.length],
+          court: "",   // ADM escolhe a quadra ao liberar
           time: timesByCategory[category]?.[index % 6] || "08:00",
           a,
           b,

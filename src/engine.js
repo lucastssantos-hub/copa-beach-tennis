@@ -163,25 +163,31 @@ export function warmupRemaining(match, now = Date.now()) {
   return Math.max(0, match.warmupEndsAt - now);
 }
 
-// Estado de cada quadra a partir da lista de confrontos
-export function courtsFromMatches(matches) {
+// Nomes canônicos das quadras (Quadra 1 … Quadra N)
+export function courtNames(n) {
+  return Array.from({ length: n }, (_, i) => `Quadra ${i + 1}`);
+}
+
+// Estado de cada quadra: gera N slots, preenchidos pelos confrontos já liberados
+export function courtsFromMatches(matches, courtCount = 4) {
+  const names = courtNames(courtCount);
   const byCourt = {};
   matches.forEach(m => {
-    (byCourt[m.court] = byCourt[m.court] || []).push(m);
+    if (m.court) (byCourt[m.court] = byCourt[m.court] || []).push(m);
   });
-  return Object.keys(byCourt).sort().map(court => {
-    const list = byCourt[court];
-    const current = list.find(m => isLive(m.status) || m.status === STATUS.AGUARDANDO_RESULTADO || m.status === STATUS.RESULTADO_CONTESTADO);
+  return names.map(court => {
+    const list = byCourt[court] || [];
+    const current = list.find(m => isLive(m.status) || m.status === STATUS.AGUARDANDO_RESULTADO || m.status === STATUS.RESULTADO_CONTESTADO) || null;
     const next = list
       .filter(m => !isTerminal(m.status) && m !== current)
-      .sort((x, y) => x.time.localeCompare(y.time))[0];
+      .sort((x, y) => x.time.localeCompare(y.time))[0] || null;
     return { court, current, next, total: list.length };
   });
 }
 
-export function kpisFromMatches(matches, categories = []) {
+export function kpisFromMatches(matches, courtCount = 4, categories = []) {
   const count = pred => matches.filter(pred).length;
-  const courts = courtsFromMatches(matches);
+  const courts = courtsFromMatches(matches, courtCount);
   const occupied = courts.filter(c => c.current).length;
   const finishedDurations = matches
     .filter(m => isTerminal(m.status) && m.result?.submittedAt)
@@ -194,7 +200,7 @@ export function kpisFromMatches(matches, categories = []) {
     aguardandoResultado: count(m => m.status === STATUS.AGUARDANDO_RESULTADO || m.status === STATUS.RESULTADO_CONTESTADO),
     aguardandoValidacao: count(m => m.status === STATUS.AGUARDANDO_VALIDACAO),
     quadrasOcupadas: occupied,
-    quadrasLivres: Math.max(0, courts.length - occupied),
+    quadrasLivres: Math.max(0, courtCount - occupied),
     categoriasAtivas: categories.filter(c => c.loaded).length,
     tempoMedio: avg,
   };
@@ -246,11 +252,13 @@ export function validateLineups(match, { actor = "admin" } = {}) {
 }
 
 // ADM libera a quadra → inicia aquecimento de 6 min
-export function releaseCourt(match, { actor = "admin", now = Date.now() } = {}) {
-  const next = { ...match, status: STATUS.AQUECIMENTO, warmupEndsAt: now + WARMUP_MS };
+// `court` é o nome da quadra escolhida pelo ADM no picker
+export function releaseCourt(match, { actor = "admin", court, now = Date.now() } = {}) {
+  const assignedCourt = court || match.court || "Quadra 1";
+  const next = { ...match, court: assignedCourt, status: STATUS.AQUECIMENTO, warmupEndsAt: now + WARMUP_MS };
   return tx(next,
-    [makeAudit({ actor, action: "Quadra liberada", matchId: match.id, detail: match.court })],
-    [makeNotification({ type: "fire", text: `Quadra liberada — ${match.court} (${match.id}) · aquecimento 6:00`, audience: "all" })]);
+    [makeAudit({ actor, action: "Quadra liberada", matchId: match.id, detail: assignedCourt })],
+    [makeNotification({ type: "fire", text: `Quadra liberada — ${assignedCourt} · aquecimento 6:00`, audience: "all" })]);
 }
 
 // Cronômetro zera (ou início manual) → EM_JOGO
