@@ -99,10 +99,10 @@ export function CentroOperacoes({ matches, category, onOpenMatch, dispatch, toas
               color: courtCount <= 1 ? "#5a4f78" : "#FBF7EE", cursor: courtCount <= 1 ? "default" : "pointer",
             }}>−</button>
             <span style={{ fontFamily: "'Archivo Black',sans-serif", fontSize: 28, color: "#FBF7EE", minWidth: 36, textAlign: "center", lineHeight: 1 }}>{courtCount}</span>
-            <button onClick={() => setCourtCount(c => Math.min(8, c + 1))} disabled={courtCount >= 8} style={{
+            <button onClick={() => setCourtCount(c => Math.min(16, c + 1))} disabled={courtCount >= 16} style={{
               width: 36, height: 36, borderRadius: 9, fontSize: 20, fontWeight: 800,
               background: "rgba(242,228,201,.08)", border: "1px solid rgba(242,228,201,.18)",
-              color: courtCount >= 8 ? "#5a4f78" : "#FBF7EE", cursor: courtCount >= 8 ? "default" : "pointer",
+              color: courtCount >= 16 ? "#5a4f78" : "#FBF7EE", cursor: courtCount >= 16 ? "default" : "pointer",
             }}>+</button>
             <span style={{ fontSize: 12.5, color: "#C9BBA0" }}>quadra{courtCount !== 1 ? "s" : ""} disponíve{courtCount !== 1 ? "is" : "l"}</span>
           </div>

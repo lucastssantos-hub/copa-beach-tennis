@@ -62,7 +62,9 @@ export default function CaptainApp() {
               <div style={{ display: "flex", alignItems: "center", gap: 9, flex: 1, minWidth: 0 }}>
                 <Flag code={teamCode} size={26} />
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, color: ACCENT, letterSpacing: ".14em" }}>CAPITÃO</div>
+                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, color: ACCENT, letterSpacing: ".14em" }}>
+                    {team.captain ? team.captain.toUpperCase() : "CAPITÃO"}
+                  </div>
                   <div style={{ fontFamily: "'Archivo Black',sans-serif", fontSize: 16, color: "#FBF7EE", lineHeight: 1, marginTop: 2,
                     whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{team.name}</div>
                 </div>
@@ -130,10 +132,13 @@ function TeamSelect({ onChoose }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
         {teams.map(t => (
           <button key={t.id} onClick={() => onChoose(t.id)} style={{ display: "flex", alignItems: "center", gap: 10,
-            padding: "15px 14px", borderRadius: 14, cursor: "pointer", textAlign: "left",
+            padding: "14px 14px", borderRadius: 14, cursor: "pointer", textAlign: "left",
             background: "rgba(242,228,201,.05)", border: "1.5px solid rgba(242,228,201,.1)" }}>
-            <span style={{ fontSize: 24, lineHeight: 1 }}>{t.flag}</span>
-            <span style={{ fontSize: 14, fontWeight: 800, color: "#FBF7EE" }}>{t.name}</span>
+            <span style={{ fontSize: 24, lineHeight: 1, flexShrink: 0 }}>{t.flag}</span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 800, color: "#FBF7EE", lineHeight: 1.2 }}>{t.name}</div>
+              {t.captain && <div style={{ fontSize: 11, color: "#8a7d63", marginTop: 2 }}>{t.captain}</div>}
+            </div>
           </button>
         ))}
       </div>

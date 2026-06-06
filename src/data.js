@@ -3,8 +3,8 @@ import { STATUS, STATUS_FLOW_META, normalizeMatch, WARMUP_MS } from "./engine.js
 
 export const FLAGS = {
   ARG: "🇦🇷", ARU: "🇦🇼", AUS: "🇦🇺", BRA: "🇧🇷", CAN: "🇨🇦",
-  CRO: "🇭🇷", ENG: "🏴", ESP: "🇪🇸", ITA: "🇮🇹", NED: "🇳🇱",
-  NOR: "🇳🇴", POR: "🇵🇹", SWE: "🇸🇪", USA: "🇺🇸",
+  ENG: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", FRA: "🇫🇷", GER: "🇩🇪", ITA: "🇮🇹", JAM: "🇯🇲",
+  NED: "🇳🇱", NOR: "🇳🇴", POR: "🇵🇹", SWE: "🇸🇪", USA: "🇺🇸",
 };
 
 export const TEAM_CODE = "BRA";
@@ -15,10 +15,11 @@ const COUNTRY_NAMES = {
   AUS: "Austrália",
   BRA: "Brasil",
   CAN: "Canadá",
-  CRO: "Croácia",
   ENG: "Inglaterra",
-  ESP: "Espanha",
+  FRA: "França",
+  GER: "Alemanha",
   ITA: "Itália",
+  JAM: "Jamaica",
   NED: "Holanda",
   NOR: "Noruega",
   POR: "Portugal",
@@ -26,24 +27,29 @@ const COUNTRY_NAMES = {
   USA: "USA",
 };
 
+// Capitão de cada seleção neste evento
+const CAPTAIN_NAMES = {
+  USA: "Jadson",   BRA: "Eudes",     ITA: "Casimiro", ARG: "Vitor",
+  POR: "David",    SWE: "Erick",     AUS: "Geovane",  NED: "Romulo",
+  ENG: "Eduardo",  CAN: "Vinão",     ARU: "Robinho",
+  FRA: "Henrique", JAM: "Martinelli",NOR: "Cláudia",  GER: "André",
+};
+
 function makeRoster(code) {
   const initials = code.toLowerCase();
   const names = {
-    BRA: {
-      women: ["Sofia Almeida", "Marina Costa", "Júlia Ferraz"],
-      men: ["Diego Ramos", "Lucas Mendes", "Rafael Pinto"],
-    },
-    ESP: { women: ["Carmen Ruiz", "Lucía Vega"], men: ["Pablo Serra", "Hugo Marín"] },
+    BRA: { women: ["Sofia Almeida", "Marina Costa", "Júlia Ferraz"], men: ["Diego Ramos", "Lucas Mendes", "Rafael Pinto"] },
     ITA: { women: ["Giulia Conti", "Sara Greco"], men: ["Marco Bruno", "Luca Ferri"] },
   }[code];
   const women = names?.women || [`${COUNTRY_NAMES[code]} F1`, `${COUNTRY_NAMES[code]} F2`];
-  const men = names?.men || [`${COUNTRY_NAMES[code]} M1`, `${COUNTRY_NAMES[code]} M2`];
+  const men   = names?.men   || [`${COUNTRY_NAMES[code]} M1`, `${COUNTRY_NAMES[code]} M2`];
   return {
     id: code,
     name: COUNTRY_NAMES[code],
     flag: FLAGS[code],
+    captain: CAPTAIN_NAMES[code] || null,
     women: women.map((name, i) => ({ id: `${initials}-w${i + 1}`, name })),
-    men: men.map((name, i) => ({ id: `${initials}-m${i + 1}`, name })),
+    men:   men.map((name, i)   => ({ id: `${initials}-m${i + 1}`, name })),
   };
 }
 
@@ -77,40 +83,42 @@ export const CATEGORIES = [
 ];
 
 export const CATEGORY_DRAWS = {
+  // Draws de DEMONSTRAÇÃO — substituir pelo chaveamento oficial do evento.
+  // ESP e CRO removidos; FRA, JAM e GER adicionados.
   A: {
     participants: 57,
     groups: [
-      group(1, ["POR", "ITA", "NOR"], [["NOR", "ITA"], ["POR", "NOR"], ["ITA", "POR"]]),
-      group(2, ["ARG", "AUS", "USA"], [["AUS", "USA"], ["ARG", "USA"], ["ARG", "AUS"]]),
-      group(3, ["ESP", "SWE", "NED"], [["SWE", "NED"], ["SWE", "ESP"], ["NED", "ESP"]]),
-      group(4, ["ARU", "BRA", "CRO", "CAN"], [["ARU", "CRO"], ["BRA", "ARU"], ["CAN", "BRA"], ["CRO", "CAN"], ["ARU", "CAN"], ["CRO", "BRA"]]),
+      group(1, ["POR", "ITA", "NOR", "GER"], [["NOR","ITA"],["POR","NOR"],["ITA","POR"],["GER","POR"],["GER","ITA"],["GER","NOR"]]),
+      group(2, ["ARG", "AUS", "USA"],         [["AUS","USA"],["ARG","USA"],["ARG","AUS"]]),
+      group(3, ["FRA", "SWE", "NED"],          [["SWE","NED"],["SWE","FRA"],["NED","FRA"]]),
+      group(4, ["ARU", "BRA", "JAM", "CAN"],  [["ARU","JAM"],["BRA","ARU"],["CAN","BRA"],["JAM","CAN"],["ARU","CAN"],["JAM","BRA"]]),
     ],
   },
   E: {
     participants: 88,
     groups: [
-      group(1, ["ITA", "ARG", "USA"], [["ITA", "USA"], ["USA", "ARG"], ["ITA", "ARG"]]),
-      group(2, ["ESP", "ENG", "POR"], [["ESP", "ENG"], ["POR", "ENG"], ["ESP", "POR"]]),
-      group(3, ["BRA", "ARU", "NOR", "CAN"], [["NOR", "BRA"], ["ARU", "CAN"], ["BRA", "CAN"], ["BRA", "ARU"], ["NOR", "CAN"], ["NOR", "ARU"]]),
-      group(4, ["SWE", "CRO", "AUS", "NED"], [["CRO", "NED"], ["NED", "SWE"], ["SWE", "AUS"], ["SWE", "CRO"], ["NED", "AUS"], ["AUS", "CRO"]]),
+      group(1, ["ITA", "ARG", "USA", "GER"],  [["ITA","USA"],["USA","ARG"],["ITA","ARG"],["GER","ITA"],["GER","USA"],["GER","ARG"]]),
+      group(2, ["FRA", "ENG", "POR"],          [["FRA","ENG"],["POR","ENG"],["FRA","POR"]]),
+      group(3, ["BRA", "ARU", "NOR", "CAN"],  [["NOR","BRA"],["ARU","CAN"],["BRA","CAN"],["BRA","ARU"],["NOR","CAN"],["NOR","ARU"]]),
+      group(4, ["SWE", "JAM", "AUS", "NED"],  [["JAM","NED"],["NED","SWE"],["SWE","AUS"],["SWE","JAM"],["NED","AUS"],["AUS","JAM"]]),
     ],
   },
   "35+": {
     participants: 65,
     groups: [
-      group(1, ["CAN", "ARG", "NOR"], [["NOR", "CAN"], ["ARG", "CAN"], ["NOR", "ARG"]]),
-      group(2, ["ITA", "ARU", "BRA"], [["ITA", "BRA"], ["ARU", "ITA"], ["BRA", "ARU"]]),
-      group(3, ["ESP", "POR", "AUS"], [["POR", "AUS"], ["AUS", "ESP"], ["POR", "ESP"]]),
-      group(4, ["USA", "ENG", "SWE", "CRO"], [["SWE", "CRO"], ["ENG", "SWE"], ["ENG", "USA"], ["ENG", "CRO"], ["USA", "CRO"], ["USA", "SWE"]]),
+      group(1, ["CAN", "ARG", "NOR", "GER"],  [["NOR","CAN"],["ARG","CAN"],["NOR","ARG"],["GER","CAN"],["GER","ARG"],["GER","NOR"]]),
+      group(2, ["ITA", "ARU", "BRA"],          [["ITA","BRA"],["ARU","ITA"],["BRA","ARU"]]),
+      group(3, ["FRA", "POR", "AUS"],          [["POR","AUS"],["AUS","FRA"],["POR","FRA"]]),
+      group(4, ["USA", "ENG", "SWE", "JAM"],  [["SWE","JAM"],["ENG","SWE"],["ENG","USA"],["ENG","JAM"],["USA","JAM"],["USA","SWE"]]),
     ],
   },
   "60+": {
     participants: 57,
     groups: [
-      group(1, ["AUS", "POR", "SWE"], [["POR", "AUS"], ["AUS", "SWE"], ["SWE", "POR"]]),
-      group(2, ["CRO", "NOR", "ENG"], [["CRO", "ENG"], ["NOR", "ENG"], ["NOR", "CRO"]]),
-      group(3, ["ARG", "CAN", "ITA"], [["ARG", "ITA"], ["CAN", "ITA"], ["CAN", "ARG"]]),
-      group(4, ["ARU", "BRA", "ESP", "USA"], [["USA", "BRA"], ["ESP", "ARU"], ["BRA", "ESP"], ["USA", "ESP"], ["ARU", "USA"], ["ARU", "BRA"]]),
+      group(1, ["AUS", "POR", "SWE", "GER"],  [["POR","AUS"],["AUS","SWE"],["SWE","POR"],["GER","AUS"],["GER","POR"],["GER","SWE"]]),
+      group(2, ["JAM", "NOR", "ENG"],          [["JAM","ENG"],["NOR","ENG"],["NOR","JAM"]]),
+      group(3, ["ARG", "CAN", "ITA"],          [["ARG","ITA"],["CAN","ITA"],["CAN","ARG"]]),
+      group(4, ["ARU", "BRA", "FRA", "USA"],  [["USA","BRA"],["FRA","ARU"],["BRA","FRA"],["USA","FRA"],["ARU","USA"],["ARU","BRA"]]),
     ],
   },
 };
