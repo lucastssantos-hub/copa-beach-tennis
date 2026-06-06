@@ -1,4 +1,5 @@
 // ============ Copa do Mundo de Beach Tennis — tournament data ============
+import { STATUS, STATUS_FLOW_META, normalizeMatch, WARMUP_MS } from "./engine.js";
 
 export const FLAGS = {
   ARG: "🇦🇷", ARU: "🇦🇼", AUS: "🇦🇺", BRA: "🇧🇷", CAN: "🇨🇦",
@@ -117,14 +118,9 @@ export const CATEGORY_DRAWS = {
 export const MATCHES = buildMatches();
 
 export const STATUS_META = {
-  aguardando:   { label: "Aguardando escalação", tone: "muted" },
-  parcial:      { label: "Escalação parcial",     tone: "warn" },
-  pronto:       { label: "Pronto para chamada",   tone: "go" },
-  andamento:    { label: "Em andamento",          tone: "live" },
-  mista:        { label: "Aguardando mista",      tone: "coral" },
-  finalizado:   { label: "Finalizado",            tone: "done" },
-  wo:           { label: "W.O.",                  tone: "coral" },
-  desistencia:  { label: "Desistência",           tone: "coral" },
+  // status canônicos de confronto (máquina de estados — engine.js)
+  ...STATUS_FLOW_META,
+  // sub-status da escalação (por equipe)
   pendente:     { label: "Pendente",   tone: "muted" },
   rascunho:     { label: "Rascunho",   tone: "warn" },
   enviada:      { label: "Enviada",    tone: "go" },
@@ -195,13 +191,83 @@ function buildMatches() {
           time: timesByCategory[category]?.[index % 6] || "08:00",
           a,
           b,
-          status: "parcial",
+          status: STATUS.AGUARDANDO_ESCALACAO,
           lineups,
           games: { fem: null, masc: null, mista: null },
+          warmupEndsAt: null,
+          presence: { [a]: false, [b]: false },
+          result: { submittedBy: null, submittedAt: null, validated: false, contested: false, reason: null, type: null },
         });
         n++;
       });
     });
   });
-  return matches;
+
+  seedLiveActivity(matches);
+  seedCaptainTasks(matches);
+  return matches.map(normalizeMatch);
+}
+
+// Garante que TODA equipe tenha ao menos um confronto com escalação pendente
+// (no confronto mais cedo ainda não tocado), para que qualquer capitão tenha
+// uma escalação a fazer ao abrir o app.
+function seedCaptainTasks(matches) {
+  const codes = new Set();
+  matches.forEach(m => { codes.add(m.a); codes.add(m.b); });
+  const catOrder = id => CATEGORIES.findIndex(c => c.id === id);
+  codes.forEach(code => {
+    const first = matches
+      .filter(m => (m.a === code || m.b === code) && m.status === STATUS.AGUARDANDO_ESCALACAO)
+      .sort((a, b) => catOrder(a.category) - catOrder(b.category) || a.time.localeCompare(b.time))[0];
+    if (first) first.lineups[code] = emptyLineup();
+  });
+}
+
+// Semeia atividade ao vivo em quadras SEM o Brasil, para o Centro de Operações e
+// a Tela Pública terem conteúdo. Confrontos do Brasil ficam pendentes de propósito,
+// para o fluxo do Capitão ser demonstrável de ponta a ponta.
+function seedLiveActivity(matches) {
+  const validate = m => { Object.keys(m.lineups).forEach(c => { m.lineups[c].status = "validada"; }); };
+  const win = (m, winner) => ({ winner, score: winner === m.a ? "6-3" : "3-6" });
+
+  const byCat = {};
+  matches.forEach(m => { (byCat[m.category] = byCat[m.category] || []).push(m); });
+
+  Object.values(byCat).forEach(list => {
+    const neutral = list.filter(m => m.a !== TEAM_CODE && m.b !== TEAM_CODE);
+    const set = (m, fn) => { if (m) fn(m); };
+
+    // 1º: finalizado 2×0 (vencedor A)
+    set(neutral[0], m => {
+      validate(m); m.presence = { [m.a]: true, [m.b]: true };
+      m.games = { fem: win(m, m.a), masc: win(m, m.a), mista: null };
+      m.status = STATUS.FINALIZADO; m.result = { ...m.result, submittedBy: "arbitro", submittedAt: Date.now() - 9e5, validated: true };
+    });
+    // 2º: finalizado 2×1 (mista decide para B)
+    set(neutral[1], m => {
+      validate(m); m.presence = { [m.a]: true, [m.b]: true };
+      Object.keys(m.lineups).forEach(c => { m.lineups[c].mista = { w: TEAMS[c].women[0].id, m: TEAMS[c].men[0].id }; });
+      m.games = { fem: win(m, m.a), masc: win(m, m.b), mista: win(m, m.b) };
+      m.status = STATUS.FINALIZADO; m.result = { ...m.result, submittedBy: "arbitro", submittedAt: Date.now() - 6e5, validated: true };
+    });
+    // 3º: em jogo (jogo 1 já decidido)
+    set(neutral[2], m => {
+      validate(m); m.presence = { [m.a]: true, [m.b]: true };
+      m.games = { fem: win(m, m.a), masc: null, mista: null };
+      m.status = STATUS.EM_JOGO;
+    });
+    // 4º: aquecimento (cronômetro correndo)
+    set(neutral[3], m => {
+      validate(m); m.presence = { [m.a]: true, [m.b]: false };
+      m.status = STATUS.AQUECIMENTO; m.warmupEndsAt = Date.now() + Math.round(WARMUP_MS * 0.7);
+    });
+    // 5º: aguardando resultado (lançado, falta ADM validar)
+    set(neutral[4], m => {
+      validate(m); m.presence = { [m.a]: true, [m.b]: true };
+      m.games = { fem: win(m, m.b), masc: win(m, m.b), mista: null };
+      m.status = STATUS.AGUARDANDO_RESULTADO; m.result = { ...m.result, submittedBy: "arbitro", submittedAt: Date.now() - 6e4 };
+    });
+    // 6º: aguardando quadra (validado, pronto p/ liberar)
+    set(neutral[5], m => { validate(m); m.status = STATUS.AGUARDANDO_QUADRA; });
+  });
 }

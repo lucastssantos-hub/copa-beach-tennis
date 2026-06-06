@@ -1,19 +1,27 @@
 // ============ Shared UI primitives ============
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { TEAMS, STATUS_META } from "./data.js";
+
+// Paleta de tons compartilhada (status pills, badges, bordas)
+export const TONES = {
+  muted:  { bg: "rgba(242,228,201,.14)", fg: "#C9BBA0", dot: "#8a7d63" },
+  sand:   { bg: "rgba(242,228,201,.20)", fg: "#E9DEC6", dot: "#D9C79E" },
+  warn:   { bg: "rgba(255,176,46,.16)",  fg: "#FFC766", dot: "#FFB02E" },
+  go:     { bg: "rgba(120,200,140,.16)", fg: "#8FE0A6", dot: "#5FC97E" },
+  fire:   { bg: "rgba(255,138,46,.20)",  fg: "#FFB36B", dot: "#FF8A2E" },
+  live:   { bg: "rgba(107,47,217,.28)",  fg: "#C9A9FF", dot: "#9B6BFF" },
+  info:   { bg: "rgba(70,140,255,.20)",  fg: "#9CC2FF", dot: "#4C8DFF" },
+  alert:  { bg: "rgba(255,64,64,.20)",   fg: "#FF8A8A", dot: "#FF4D4D" },
+  coral:  { bg: "rgba(255,90,78,.18)",   fg: "#FF8478", dot: "#FF5A4E" },
+  done:   { bg: "rgba(120,200,140,.12)", fg: "#7FCF97", dot: "#5FC97E" },
+};
+const PULSE_TONES = new Set(["live", "fire", "alert"]);
 
 // Status pill — reads tone from STATUS_META
 export function StatusPill({ status, size = "md" }) {
   const meta = STATUS_META[status] || { label: status, tone: "muted" };
-  const tones = {
-    muted:  { bg: "rgba(242,228,201,.14)", fg: "#C9BBA0", dot: "#8a7d63" },
-    warn:   { bg: "rgba(255,176,46,.16)",  fg: "#FFC766", dot: "#FFB02E" },
-    go:     { bg: "rgba(120,200,140,.16)", fg: "#8FE0A6", dot: "#5FC97E" },
-    live:   { bg: "rgba(107,47,217,.28)",  fg: "#C9A9FF", dot: "#9B6BFF" },
-    coral:  { bg: "rgba(255,90,78,.18)",   fg: "#FF8478", dot: "#FF5A4E" },
-    done:   { bg: "rgba(120,200,140,.12)", fg: "#7FCF97", dot: "#5FC97E" },
-  };
-  const t = tones[meta.tone] || tones.muted;
+  const t = TONES[meta.tone] || TONES.muted;
+  const pulse = PULSE_TONES.has(meta.tone);
   return (
     <span style={{
       display: "inline-flex", alignItems: "center", gap: 6,
@@ -24,8 +32,8 @@ export function StatusPill({ status, size = "md" }) {
       letterSpacing: ".02em", whiteSpace: "nowrap", textTransform: "uppercase",
     }}>
       <span style={{ width: 6, height: 6, borderRadius: 99, background: t.dot,
-        boxShadow: meta.tone === "live" ? `0 0 0 3px ${t.bg}` : "none",
-        animation: meta.tone === "live" ? "pulse 1.4s infinite" : "none" }} />
+        boxShadow: pulse ? `0 0 0 3px ${t.bg}` : "none",
+        animation: pulse ? "pulse 1.4s infinite" : "none" }} />
       {meta.label}
     </span>
   );
@@ -78,11 +86,11 @@ export function Card({ children, onClick, style, accent }) {
     }}
     style={{
       background: "linear-gradient(180deg, rgba(251,247,238,.05), rgba(251,247,238,.02))",
-      border: "1px solid rgba(242,228,201,.1)",
+      borderWidth: 1, borderStyle: "solid",
+      borderColor: accent ? "rgba(255,90,78,.3)" : "rgba(242,228,201,.1)",
       borderRadius: 18, padding: 16,
       cursor: onClick ? "pointer" : "default",
       transition: "border-color .15s ease, transform .12s ease",
-      ...(accent ? { borderColor: "rgba(255,90,78,.3)" } : {}),
       ...style,
     }}
     onMouseEnter={e => onClick && (e.currentTarget.style.borderColor = "rgba(242,228,201,.28)")}
@@ -132,6 +140,42 @@ export function VersusRow({ a, b, center }) {
         <Flag code={b} />
       </div>
     </div>
+  );
+}
+
+// Countdown mm:ss — ticks every second toward `endsAt` (ms epoch)
+export function Countdown({ endsAt, size = 22, color = "#FFB36B", onZero }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const remaining = Math.max(0, (endsAt || 0) - now);
+  useEffect(() => { if (endsAt && remaining === 0 && onZero) onZero(); }, [remaining === 0]);
+  const total = Math.ceil(remaining / 1000);
+  const mm = String(Math.floor(total / 60)).padStart(2, "0");
+  const ss = String(total % 60).padStart(2, "0");
+  return (
+    <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700, fontSize: size, color,
+      fontVariantNumeric: "tabular-nums", letterSpacing: ".02em" }}>{mm}:{ss}</span>
+  );
+}
+
+// Notification bell with unread badge
+export function Bell({ count = 0, onClick, color = "#E9DEC6" }) {
+  return (
+    <button onClick={onClick} aria-label="Notificações" style={{ position: "relative", width: 40, height: 40,
+      borderRadius: 12, background: "rgba(242,228,201,.08)", border: "1px solid rgba(242,228,201,.14)",
+      color, fontSize: 18, cursor: "pointer", display: "grid", placeItems: "center", flexShrink: 0 }}>
+      <span>◔</span>
+      {count > 0 && (
+        <span style={{ position: "absolute", top: -5, right: -5, minWidth: 18, height: 18, padding: "0 4px",
+          borderRadius: 999, background: "#FF4D4D", color: "#fff", fontSize: 10.5, fontWeight: 800,
+          display: "grid", placeItems: "center", fontFamily: "'Archivo',sans-serif" }}>
+          {count > 9 ? "9+" : count}
+        </span>
+      )}
+    </button>
   );
 }
 

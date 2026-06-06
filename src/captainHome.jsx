@@ -1,6 +1,7 @@
 // ============ Área do Capitão (controla a equipe Brasil) ============
-import { TEAMS, TEAM_CODE } from "./data.js";
-import { Eyebrow, StatusPill, VersusRow, Button, Card, Flag, AppBar } from "./components.jsx";
+import { TEAMS, confrontoScore } from "./data.js";
+import { STATUS, isLive } from "./engine.js";
+import { Eyebrow, StatusPill, VersusRow, Button, Card, Flag, AppBar, Countdown } from "./components.jsx";
 
 // Athlete selector chip-grid for a duo
 export function DuoPicker({ label, pool, selected, onPick, locked, gender }) {
@@ -40,20 +41,52 @@ export function DuoPicker({ label, pool, selected, onPick, locked, gender }) {
 }
 
 // ---------- Captain Home ----------
-export function CaptainHome({ matches, category, onOpenMatch }) {
-  const team = TEAMS[TEAM_CODE];
-  const upcoming = matches.filter(m => (m.a === TEAM_CODE || m.b === TEAM_CODE) &&
-    !["finalizado", "wo", "desistencia"].includes(m.status));
+export function CaptainHome({ matches, category, onOpenMatch, me }) {
+  const team = TEAMS[me];
+  const mine = matches.filter(m => m.a === me || m.b === me);
+  const TERMINAL = [STATUS.FINALIZADO, STATUS.WO, STATUS.DESISTENCIA];
+  const active = mine.find(m => isLive(m.status) || m.status === STATUS.AGUARDANDO_RESULTADO || m.status === STATUS.RESULTADO_CONTESTADO);
+  const upcoming = mine.filter(m => !TERMINAL.includes(m.status) && m !== active);
   const next = upcoming[0];
-  const lineup = next ? next.lineups[TEAM_CODE] : null;
+  const lineup = next ? next.lineups[me] : null;
 
   return (
     <div style={{ padding: "0 20px 110px" }}>
       <AppBar subtitle={`Categoria ${category.label} · ${category.schedule}`} title={`${team.flag} ${team.name}`}
         right={<div style={{ textAlign: "right" }}>
           <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 10, color: "#8a7d63", letterSpacing: ".1em" }}>CAPITÃO</div>
-          <div style={{ fontSize: 12, color: "#C9BBA0", fontWeight: 600 }}>D. Ramos</div>
+          <div style={{ fontSize: 12, color: "#C9BBA0", fontWeight: 600 }}>{team.name}</div>
         </div>} />
+
+      {/* Quadra Atual */}
+      {active && (() => {
+        const opp = active.a === me ? active.b : active.a;
+        const s = confrontoScore(active);
+        const live = isLive(active.status);
+        return (
+          <Card onClick={() => onOpenMatch(active.id)} accent style={{ marginTop: 4, marginBottom: 16,
+            background: "rgba(255,138,46,.08)", borderColor: "rgba(255,138,46,.3)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+              <Eyebrow color="#FFB36B">Quadra atual</Eyebrow>
+              <StatusPill status={active.status} size="sm" />
+            </div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Flag code={opp} size={20} />
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "#FBF7EE" }}>vs {TEAMS[opp].name}</div>
+                  <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: "#C9BBA0", marginTop: 2 }}>◇ {active.court} · {active.phase}</div>
+                </div>
+              </div>
+              {active.status === STATUS.AQUECIMENTO && active.warmupEndsAt
+                ? <Countdown endsAt={active.warmupEndsAt} size={26} />
+                : live
+                  ? <span style={{ fontFamily: "'Archivo Black',sans-serif", fontSize: 24, color: "#FBF7EE" }}>{s.a} × {s.b}</span>
+                  : null}
+            </div>
+          </Card>
+        );
+      })()}
 
       {next && (
         <Card accent style={{ marginTop: 4, padding: 0, overflow: "hidden" }}>
@@ -91,14 +124,20 @@ export function CaptainHome({ matches, category, onOpenMatch }) {
         </Card>
       )}
 
-      {!next && (
+      {!next && mine.length === 0 && (
         <Card style={{ marginTop: 4, background: "rgba(255,176,46,.06)", borderColor: "rgba(255,176,46,.18)" }}>
           <div style={{ fontFamily: "'Archivo Black',sans-serif", fontSize: 16, color: "#FBF7EE", marginBottom: 6 }}>
-            Chave ainda não carregada
+            Sua equipe não joga nesta categoria
           </div>
           <div style={{ color: "#C9BBA0", fontSize: 12.5, lineHeight: 1.45 }}>
-            Essa categoria está no cronograma, mas ainda precisa do PDF de confrontos para aparecer na operação.
+            Selecione outra categoria no topo para ver seus confrontos.
           </div>
+        </Card>
+      )}
+      {!next && mine.length > 0 && !active && (
+        <Card style={{ marginTop: 4, background: "rgba(120,200,140,.06)", borderColor: "rgba(120,200,140,.18)" }}>
+          <div style={{ color: "#8FE0A6", fontSize: 13, fontWeight: 700 }}>✓ Nenhum confronto pendente agora.</div>
+          <div style={{ color: "#C9BBA0", fontSize: 12.5, marginTop: 4, lineHeight: 1.45 }}>Acompanhe os resultados e a classificação na aba Resultados.</div>
         </Card>
       )}
 
@@ -125,9 +164,8 @@ export function CaptainHome({ matches, category, onOpenMatch }) {
       <div style={{ marginTop: 22 }}>
         <Eyebrow>Seus confrontos</Eyebrow>
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
-          {matches.filter(m => m.a === TEAM_CODE || m.b === TEAM_CODE).map(m => {
-            const opp = m.a === TEAM_CODE ? m.b : m.a;
-            const done = ["finalizado", "wo", "desistencia"].includes(m.status);
+          {mine.map(m => {
+            const opp = m.a === me ? m.b : m.a;
             return (
               <Card key={m.id} onClick={() => onOpenMatch(m.id)} style={{ padding: "13px 15px" }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -136,7 +174,7 @@ export function CaptainHome({ matches, category, onOpenMatch }) {
                     <Flag code={opp} size={18} />
                     <span style={{ fontSize: 14, fontWeight: 700, color: "#FBF7EE" }}>{TEAMS[opp].name}</span>
                   </div>
-                  <StatusPill status={done ? m.status : m.lineups[TEAM_CODE].status} size="sm" />
+                  <StatusPill status={m.status} size="sm" />
                 </div>
               </Card>
             );

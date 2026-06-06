@@ -1,10 +1,37 @@
-// ============ Arbitragem — Tela do confronto (ações + placar) ============
+// ============================================================================
+// arbMatch.jsx — Peças compartilhadas do confronto (placar, registro de jogo,
+// coluna de escalação). Usadas pelo Mesário (refereeFlow) e pela Organização
+// (adminOps). A validação de escalação NÃO vive mais aqui (é ação do ADM).
+// ============================================================================
 import { useState } from "react";
 import { TEAMS, athleteName, confrontoScore } from "./data.js";
-import { StatusPill, Flag, AppBar, Card, Eyebrow, Button } from "./components.jsx";
+import { Flag, Card, Button } from "./components.jsx";
 import { DuoLine } from "./captainMatch.jsx";
 
-function ScoreEditor({ match, gameKey, onSave, onCancel }) {
+// Placar grande do confronto (sets ganhos)
+export function Scoreboard({ match }) {
+  const s = confrontoScore(match);
+  return (
+    <Card style={{ padding: "18px 16px", background: "linear-gradient(135deg, rgba(107,47,217,.22), rgba(58,14,122,.1))" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 10 }}>
+        <div style={{ textAlign: "center" }}>
+          <Flag code={match.a} size={30} />
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#FBF7EE", marginTop: 4 }}>{TEAMS[match.a].name}</div>
+        </div>
+        <div style={{ fontFamily: "'Archivo Black',sans-serif", fontSize: 40, color: "#FBF7EE", lineHeight: 1 }}>
+          {s.a}<span style={{ color: "#6B2FD9", margin: "0 6px" }}>×</span>{s.b}
+        </div>
+        <div style={{ textAlign: "center" }}>
+          <Flag code={match.b} size={30} />
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#FBF7EE", marginTop: 4 }}>{TEAMS[match.b].name}</div>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// Editor de placar (bottom sheet)
+export function ScoreEditor({ match, gameKey, onSave, onCancel }) {
   const [winner, setWinner] = useState(null);
   const [aGames, setAGames] = useState(6);
   const [bGames, setBGames] = useState(4);
@@ -85,8 +112,8 @@ function Stepper({ label, value, onUp, onDown }) {
 const stepBtn = { width: 34, height: 34, borderRadius: 10, background: "rgba(242,228,201,.08)",
   border: "1px solid rgba(242,228,201,.14)", color: "#FBF7EE", fontSize: 18, cursor: "pointer" };
 
-// Lineup column for one team in the referee match view
-function ArbLineupCol({ match, code }) {
+// Coluna de escalação de uma equipe (visão árbitro/ADM)
+export function ArbLineupCol({ match, code }) {
   const l = match.lineups[code];
   const empty = l.status === "pendente";
   return (
@@ -95,11 +122,10 @@ function ArbLineupCol({ match, code }) {
         <Flag code={code} size={20} />
         <span style={{ fontSize: 14, fontWeight: 700, color: "#FBF7EE", flex: 1 }}>{TEAMS[code].name}</span>
       </div>
-      <StatusPill status={l.status} size="sm" />
       {empty ? (
-        <div style={{ marginTop: 12, fontSize: 12, color: "#8a7d63", fontStyle: "italic" }}>Escalação não enviada</div>
+        <div style={{ marginTop: 4, fontSize: 12, color: "#8a7d63", fontStyle: "italic" }}>Escalação não enviada</div>
       ) : (
-        <div style={{ marginTop: 12, display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ marginTop: 4, display: "flex", flexDirection: "column", gap: 12 }}>
           <div>
             <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 9.5, color: "#FF8478", letterSpacing: ".06em", marginBottom: 6 }}>FEMININA</div>
             <DuoLine name={athleteName(code, l.fem[0])} gender="f" />
@@ -123,149 +149,8 @@ function ArbLineupCol({ match, code }) {
   );
 }
 
-export function ArbMatch({ match, onBack, onUpdate, onSetStatus, toast }) {
-  const [editing, setEditing] = useState(null); // gameKey
-  const s = confrontoScore(match);
-  const bothValidated = Object.values(match.lineups).every(l => l.status === "validada");
-  const anySent = Object.values(match.lineups).some(l => l.status === "enviada");
-  const waitingLineups = Object.values(match.lineups).some(l => ["pendente", "rascunho"].includes(l.status));
-  const game1Done = match.games.fem && match.games.fem.winner;
-  const game2Done = match.games.masc && match.games.masc.winner;
-  const mistaDone = match.games.mista && match.games.mista.winner;
-  const bothMistaSent = Object.values(match.lineups).every(l => !!l.mista);
-
-  function validateAll() {
-    const lu = { ...match.lineups };
-    Object.keys(lu).forEach(k => { if (lu[k].status === "enviada") lu[k] = { ...lu[k], status: "validada" }; });
-    onUpdate(match.id, null, lu);
-    const ready = Object.values(lu).every(l => l.status === "validada");
-    toast(ready ? "Escalações validadas. Confronto pronto para chamada" : "Escalação validada. Aguardando a outra equipe");
-  }
-  function callMatch() { onSetStatus(match.id, "andamento"); toast("Jogo chamado — em andamento"); }
-  function fillMissingMixedLineups() {
-    const lineups = { ...match.lineups };
-    Object.keys(lineups).forEach(code => {
-      if (!lineups[code].mista) {
-        lineups[code] = {
-          ...lineups[code],
-          mista: { w: TEAMS[code].women[0].id, m: TEAMS[code].men[0].id },
-        };
-      }
-    });
-    onUpdate(match.id, null, lineups);
-    toast("Duplas mistas pendentes preenchidas");
-  }
-
-  function saveScore(gameKey, result) {
-    const games = { ...match.games, [gameKey]: result };
-    let nextStatus = match.status;
-    // recompute after fem+masc
-    const aWins = ["fem", "masc"].filter(k => games[k] && games[k].winner === match.a).length;
-    const bWins = ["fem", "masc"].filter(k => games[k] && games[k].winner === match.b).length;
-    if (gameKey === "masc" && games.fem) {
-      if (aWins === 1 && bWins === 1) nextStatus = "mista"; // tie → release mista
-      else nextStatus = "finalizado";
-    }
-    if (gameKey === "mista") nextStatus = "finalizado";
-    onUpdate(match.id, "__games", games);
-    onSetStatus(match.id, nextStatus);
-    setEditing(null);
-    if (nextStatus === "mista") toast("Empate 1×1 — dupla mista liberada aos capitães");
-    else if (nextStatus === "finalizado") toast("Confronto finalizado");
-    else toast("Placar registrado");
-  }
-
-  const done = ["finalizado", "wo", "desistencia"].includes(match.status);
-
-  return (
-    <div style={{ padding: "0 20px 130px", position: "relative" }}>
-      <AppBar onBack={onBack} subtitle={`Categoria ${match.category} · ${match.phase} · ${match.court}`}
-        title={`${TEAMS[match.a].name} vs ${TEAMS[match.b].name}`}
-        right={<StatusPill status={match.status} size="sm" />} />
-
-      {/* Scoreboard */}
-      <Card style={{ padding: "18px 16px", background: "linear-gradient(135deg, rgba(107,47,217,.22), rgba(58,14,122,.1))" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 10 }}>
-          <div style={{ textAlign: "center" }}>
-            <Flag code={match.a} size={30} />
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#FBF7EE", marginTop: 4 }}>{TEAMS[match.a].name}</div>
-          </div>
-          <div style={{ fontFamily: "'Archivo Black',sans-serif", fontSize: 40, color: "#FBF7EE", lineHeight: 1 }}>
-            {s.a}<span style={{ color: "#6B2FD9", margin: "0 6px" }}>×</span>{s.b}
-          </div>
-          <div style={{ textAlign: "center" }}>
-            <Flag code={match.b} size={30} />
-            <div style={{ fontSize: 13, fontWeight: 700, color: "#FBF7EE", marginTop: 4 }}>{TEAMS[match.b].name}</div>
-          </div>
-        </div>
-      </Card>
-
-      {/* Games */}
-      <div style={{ marginTop: 18 }}>
-        <Eyebrow>Jogos do confronto</Eyebrow>
-        <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 12 }}>
-          <GameRow n="1" label="Feminina" game={match.games.fem} match={match}
-            canEdit={match.status === "andamento" && !game1Done}
-            onEdit={() => setEditing("fem")} />
-          <GameRow n="2" label="Masculina" game={match.games.masc} match={match}
-            canEdit={match.status === "andamento" && game1Done && !game2Done}
-            locked={!game1Done && !game2Done}
-            onEdit={() => setEditing("masc")} />
-          <GameRow n="3" label="Mista" game={match.games.mista} match={match}
-            mista
-            visible={match.status === "mista" || mistaDone}
-            waiting={match.status === "mista" && !bothMistaSent}
-            canEdit={match.status === "mista" && bothMistaSent && !mistaDone}
-            onEdit={() => setEditing("mista")} />
-        </div>
-      </div>
-
-      {/* Lineups */}
-      <div style={{ marginTop: 22 }}>
-        <Eyebrow>Escalações</Eyebrow>
-        <Card style={{ marginTop: 12, display: "grid", gridTemplateColumns: "1fr 1px 1fr", gap: 14 }}>
-          <ArbLineupCol match={match} code={match.a} />
-          <div style={{ background: "rgba(242,228,201,.1)" }} />
-          <ArbLineupCol match={match} code={match.b} />
-        </Card>
-      </div>
-
-      {/* Actions */}
-      {!done && (
-        <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 10 }}>
-          <Eyebrow>Ações do árbitro</Eyebrow>
-          {anySent && (
-            <Button full variant="solid" onClick={validateAll}>✓ Validar escalações enviadas</Button>
-          )}
-          {!anySent && waitingLineups && (
-            <Card style={{ padding: "12px 14px", background: "rgba(255,176,46,.08)", borderColor: "rgba(255,176,46,.2)" }}>
-              <div style={{ fontSize: 12.5, color: "#FFC766", fontWeight: 600 }}>
-                Aguardando envio de escalação para liberar a validação.
-              </div>
-            </Card>
-          )}
-          {bothValidated && match.status !== "andamento" && match.status !== "mista" && (
-            <Button full onClick={callMatch}>📣 Chamar jogo</Button>
-          )}
-          {match.status === "mista" && !bothMistaSent && (
-            <Button full variant="sand" onClick={fillMissingMixedLineups}>Preencher mistas pendentes</Button>
-          )}
-          <div style={{ display: "flex", gap: 10 }}>
-            <Button variant="danger" onClick={() => { onSetStatus(match.id, "wo"); toast("Confronto marcado como W.O."); }}>Marcar W.O.</Button>
-            <div style={{ flex: 1 }}>
-              <Button full variant="danger" onClick={() => { onSetStatus(match.id, "desistencia"); toast("Desistência registrada"); }}>Desistência</Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {editing && <ScoreEditor match={match} gameKey={editing} onCancel={() => setEditing(null)}
-        onSave={r => saveScore(editing, r)} />}
-    </div>
-  );
-}
-
-function GameRow({ n, label, game, match, canEdit, onEdit, locked, mista, visible = true, waiting }) {
+// Linha de um jogo do confronto (com ação de registrar quando habilitado)
+export function GameRow({ n, label, game, match, canEdit, onEdit, locked, mista, visible = true, waiting }) {
   if (mista && !visible) {
     return (
       <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "13px 15px", borderRadius: 13,
@@ -294,7 +179,7 @@ function GameRow({ n, label, game, match, canEdit, onEdit, locked, mista, visibl
           </div>
         ) : (
           <div style={{ fontSize: 11, color: "#8a7d63", marginTop: 2 }}>
-            {waiting ? "Aguardando duplas mistas dos capitães" : locked ? "Aguardando jogo anterior" : canEdit ? "Pronto para registrar" : "Aguardando chamada"}
+            {waiting ? "Aguardando duplas mistas dos capitães" : locked ? "Aguardando jogo anterior" : canEdit ? "Pronto para registrar" : "Aguardando início"}
           </div>
         )}
       </div>
@@ -303,7 +188,7 @@ function GameRow({ n, label, game, match, canEdit, onEdit, locked, mista, visibl
   );
 }
 
-function GameNum({ n, done, dim }) {
+export function GameNum({ n, done, dim }) {
   return (
     <span style={{ width: 30, height: 30, borderRadius: 9, flexShrink: 0, display: "grid", placeItems: "center",
       fontFamily: "'Archivo Black',sans-serif", fontSize: 13,

@@ -1,25 +1,30 @@
 // ============ Classificação (standings) — shared ============
-import { TEAMS, TEAM_CODE, confrontoScore } from "./data.js";
+import { TEAMS, confrontoScore } from "./data.js";
+import { isTerminal } from "./engine.js";
 import { Flag, AppBar, Eyebrow, Card } from "./components.jsx";
 
+// Classificação automática. Só conta confrontos FINALIZADOS (validados pela ADM).
+// Desempate: 1) vitórias no confronto  2) vitórias de partidas  3) saldo de games
+//            4) confronto direto (head-to-head)  5) total de games  (6) sorteio manual)
 export function computeStandings(matches, group = "Grupo A") {
   const codes = new Set();
   matches.filter(m => m.phase === group).forEach(m => { codes.add(m.a); codes.add(m.b); });
   const table = {};
   codes.forEach(c => { table[c] = { code: c, j: 0, v: 0, d: 0, sv: 0, games: 0, gc: 0 }; });
+  const h2h = {}; // h2h[winner][loser] = nº de confrontos vencidos no duelo direto
 
-  matches.filter(m => m.phase === group && ["finalizado", "wo", "desistencia"].includes(m.status)).forEach(m => {
+  matches.filter(m => m.phase === group && isTerminal(m.status)).forEach(m => {
     const s = confrontoScore(m);
     table[m.a].j++; table[m.b].j++;
-    // confronto win
-    if (s.a > s.b) { table[m.a].v++; table[m.b].d++; }
-    else if (s.b > s.a) { table[m.b].v++; table[m.a].d++; }
-    // partida balance + games
+    if (s.a > s.b) { table[m.a].v++; table[m.b].d++; (h2h[m.a] = h2h[m.a] || {})[m.b] = (h2h[m.a]?.[m.b] || 0) + 1; }
+    else if (s.b > s.a) { table[m.b].v++; table[m.a].d++; (h2h[m.b] = h2h[m.b] || {})[m.a] = (h2h[m.b]?.[m.a] || 0) + 1; }
     ["fem", "masc", "mista"].forEach(k => {
       const g = m.games[k];
       if (!g || !g.winner) return;
       if (g.winner === m.a) table[m.a].sv++; else table[m.b].sv++;
       const [ga, gb] = (g.score || "0-0").split("-").map(Number);
+      const valid = Number.isFinite(ga) && Number.isFinite(gb); // ignora "W.O."/"DESIST."
+      if (!valid) return;
       const aGames = g.winner === m.a ? ga : gb;
       const bGames = g.winner === m.a ? gb : ga;
       table[m.a].games += aGames; table[m.a].gc += bGames;
@@ -27,8 +32,15 @@ export function computeStandings(matches, group = "Grupo A") {
     });
   });
 
-  return Object.values(table).sort((x, y) =>
-    y.v - x.v || y.sv - x.sv || (y.games - y.gc) - (x.games - x.gc) || y.games - x.games);
+  const saldo = r => r.games - r.gc;
+  return Object.values(table).sort((x, y) => {
+    if (y.v !== x.v) return y.v - x.v;
+    if (y.sv !== x.sv) return y.sv - x.sv;
+    if (saldo(y) !== saldo(x)) return saldo(y) - saldo(x);
+    const direct = (h2h[y.code]?.[x.code] || 0) - (h2h[x.code]?.[y.code] || 0); // confronto direto
+    if (direct !== 0) return direct;
+    return y.games - x.games;
+  });
 }
 
 export function Classificacao({ matches, highlight, group = "Grupo 1" }) {
@@ -76,10 +88,9 @@ export function Classificacao({ matches, highlight, group = "Grupo 1" }) {
 }
 
 // ---------- Captain History ----------
-export function CaptainHistory({ matches, category }) {
-  const me = TEAM_CODE;
+export function CaptainHistory({ matches, category, me }) {
   const mine = matches.filter(m => (m.a === me || m.b === me));
-  const played = mine.filter(m => ["finalizado", "wo", "desistencia"].includes(m.status));
+  const played = mine.filter(m => isTerminal(m.status));
   const wins = played.filter(m => { const s = confrontoScore(m); const isA = m.a === me; return (isA ? s.a > s.b : s.b > s.a); }).length;
 
   return (

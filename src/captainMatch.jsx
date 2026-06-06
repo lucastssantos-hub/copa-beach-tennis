@@ -1,11 +1,11 @@
-// ============ Captain — Match detail / Escalação ============
+// ============ Captain — Match detail / Escalação / Contestação ============
 import { useState } from "react";
-import { TEAMS, TEAM_CODE, athleteName, confrontoScore } from "./data.js";
+import { TEAMS, athleteName, confrontoScore } from "./data.js";
+import { STATUS, isTerminal, needsMista, saveDraftLineup, submitLineup, submitMista, contestResult } from "./engine.js";
 import { AppBar, Card, StatusPill, Eyebrow, Button, Flag } from "./components.jsx";
 import { DuoPicker } from "./captainHome.jsx";
 
-export function CaptainMatch({ match, onBack, onUpdate, toast }) {
-  const me = TEAM_CODE;
+export function CaptainMatch({ match, onBack, dispatch, toast, me }) {
   const opp = match.a === me ? match.b : match.a;
   const lineup = match.lineups[me];
   const editable = lineup.status === "pendente" || lineup.status === "rascunho";
@@ -15,10 +15,13 @@ export function CaptainMatch({ match, onBack, onUpdate, toast }) {
   const [masc, setMasc] = useState(lineup.masc);
   const [mistaW, setMistaW] = useState(lineup.mista ? lineup.mista.w : null);
   const [mistaM, setMistaM] = useState(lineup.mista ? lineup.mista.m : null);
+  const [contesting, setContesting] = useState(false);
+  const [reason, setReason] = useState("");
 
   const score = confrontoScore(match);
-  const tied = match.status === "mista"; // referee released the mista
+  const tied = needsMista(match); // 1×1, mista ainda não decidida
   const mistaSent = !!lineup.mista;
+  const canContest = match.status === STATUS.AGUARDANDO_RESULTADO || match.status === STATUS.FINALIZADO;
 
   function pickInto(list, setList, id) {
     if (list.includes(id)) setList(list.map(x => x === id ? null : x));
@@ -30,17 +33,22 @@ export function CaptainMatch({ match, onBack, onUpdate, toast }) {
   const complete = femOk && mascOk;
 
   function saveDraft() {
-    onUpdate(match.id, me, { ...lineup, status: "rascunho", fem, masc });
+    dispatch(saveDraftLineup(match, me, { ...lineup, fem, masc }));
     toast("Rascunho salvo");
   }
   function send() {
-    onUpdate(match.id, me, { ...lineup, status: "enviada", fem, masc });
-    toast("Escalação enviada para a arbitragem");
+    dispatch(submitLineup(match, me, { ...lineup, fem, masc }, { actor: "capitao", teams: TEAMS }));
+    toast("Escalação enviada para a Organização");
     onBack();
   }
   function sendMista() {
-    onUpdate(match.id, me, { ...lineup, mista: { w: mistaW, m: mistaM } });
+    dispatch(submitMista(match, me, { w: mistaW, m: mistaM }));
     toast("Dupla mista enviada");
+  }
+  function doContest() {
+    dispatch(contestResult(match, reason.trim(), { actor: "capitao" }));
+    toast("Contestação enviada à Organização");
+    setContesting(false); setReason("");
   }
 
   return (
@@ -84,7 +92,7 @@ export function CaptainMatch({ match, onBack, onUpdate, toast }) {
             <div style={{ flex: 1 }}><Button full disabled={!complete} onClick={send}>Enviar escalação</Button></div>
           </div>
           <div style={{ fontSize: 11.5, color: "#8a7d63", marginTop: 12, textAlign: "center", lineHeight: 1.4 }}>
-            Após o envio, alterações não serão permitidas<br />depois da validação da arbitragem.
+            Após o envio, a Organização valida a escalação<br />e libera a quadra.
           </div>
         </>
       ) : (
@@ -96,7 +104,7 @@ export function CaptainMatch({ match, onBack, onUpdate, toast }) {
           </div>
           <LineupView code={me} lineup={lineup} game1={match.games.fem} game2={match.games.masc} />
 
-          {/* Mista flow */}
+          {/* Mista flow (sub-fase de EM_JOGO) */}
           {(match.games.fem || match.games.masc) && (
             <div style={{ marginTop: 20 }}>
               <Card style={{ background: tied ? "rgba(255,90,78,.08)" : "rgba(242,228,201,.04)",
@@ -133,6 +141,33 @@ export function CaptainMatch({ match, onBack, onUpdate, toast }) {
                 )}
               </Card>
             </div>
+          )}
+
+          {/* Contestação */}
+          {canContest && match.status !== STATUS.RESULTADO_CONTESTADO && (
+            <div style={{ marginTop: 20 }}>
+              {!contesting ? (
+                <Button full variant="danger" onClick={() => setContesting(true)}>⚑ Contestar resultado</Button>
+              ) : (
+                <Card style={{ padding: "14px 16px", background: "rgba(255,64,64,.08)", borderColor: "rgba(255,64,64,.28)" }}>
+                  <Eyebrow color="#FF8A8A">Contestar resultado</Eyebrow>
+                  <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3}
+                    placeholder="Descreva o motivo da contestação"
+                    style={{ width: "100%", marginTop: 10, marginBottom: 10, padding: "10px 12px", borderRadius: 12,
+                      background: "rgba(14,5,24,.5)", border: "1px solid rgba(242,228,201,.16)", color: "#FBF7EE",
+                      fontFamily: "'Archivo',sans-serif", fontSize: 13, resize: "vertical" }} />
+                  <div style={{ display: "flex", gap: 10 }}>
+                    <Button variant="ghost" onClick={() => { setContesting(false); setReason(""); }}>Cancelar</Button>
+                    <div style={{ flex: 1 }}><Button full variant="danger" disabled={!reason.trim()} onClick={doContest}>Enviar contestação</Button></div>
+                  </div>
+                </Card>
+              )}
+            </div>
+          )}
+          {match.status === STATUS.RESULTADO_CONTESTADO && (
+            <Card style={{ marginTop: 20, padding: "13px 15px", background: "rgba(255,64,64,.08)", borderColor: "rgba(255,64,64,.28)" }}>
+              <div style={{ fontSize: 12.5, color: "#FF8A8A", fontWeight: 700 }}>Contestação enviada. Aguardando decisão da Organização.</div>
+            </Card>
           )}
         </>
       )}
