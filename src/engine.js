@@ -105,8 +105,9 @@ function lineupStatuses(match) {
 
 export function deriveStatusFromLineups(match) {
   const ls = lineupStatuses(match);
-  if (ls.length && ls.every(s => s === "validada")) return STATUS.AGUARDANDO_QUADRA;
-  if (ls.length && ls.every(s => s === "enviada" || s === "validada")) return STATUS.AGUARDANDO_VALIDACAO;
+  // Quando ambas as equipes enviaram (ou validadas), vai direto para AGUARDANDO_QUADRA
+  // sem passar por AGUARDANDO_VALIDACAO — validação de escalação é automática.
+  if (ls.length && ls.every(s => s === "enviada" || s === "validada")) return STATUS.AGUARDANDO_QUADRA;
   if (ls.some(s => s === "enviada" || s === "validada")) return STATUS.ESCALACAO_ENVIADA;
   return STATUS.AGUARDANDO_ESCALACAO;
 }

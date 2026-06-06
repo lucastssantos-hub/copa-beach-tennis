@@ -7,12 +7,12 @@ import { useState } from "react";
 import { TEAMS, confrontoScore } from "./data.js";
 import {
   STATUS, courtsFromMatches, kpisFromMatches, isTerminal, isLive,
-  validateLineups, releaseCourt, warmupToPlay, validateResult, resolveContest, markWalkover,
+  releaseCourt, warmupToPlay, validateResult, resolveContest, markWalkover,
 } from "./engine.js";
 import { AppBar, Card, Eyebrow, Button, Flag, StatusPill, Countdown } from "./components.jsx";
 import { Scoreboard, GameRow, ArbLineupCol } from "./arbMatch.jsx";
 
-const PENDING = [STATUS.AGUARDANDO_VALIDACAO, STATUS.AGUARDANDO_QUADRA, STATUS.AGUARDANDO_RESULTADO, STATUS.RESULTADO_CONTESTADO];
+const PENDING = [STATUS.AGUARDANDO_QUADRA, STATUS.AGUARDANDO_RESULTADO, STATUS.RESULTADO_CONTESTADO];
 
 // ---------- Centro de Operações ----------
 export function CentroOperacoes({ matches, category, onOpenMatch, dispatch, toast }) {
@@ -22,13 +22,11 @@ export function CentroOperacoes({ matches, category, onOpenMatch, dispatch, toas
     .sort((a, b) => PENDING.indexOf(a.status) - PENDING.indexOf(b.status) || a.time.localeCompare(b.time));
 
   function quickAction(m) {
-    if (m.status === STATUS.AGUARDANDO_VALIDACAO) { dispatch(validateLineups(m, { actor: "admin" })); toast("Escalações validadas"); }
-    else if (m.status === STATUS.AGUARDANDO_QUADRA) { dispatch(releaseCourt(m, { actor: "admin" })); toast(`Quadra liberada · aquecimento 6:00`); }
+    if (m.status === STATUS.AGUARDANDO_QUADRA) { dispatch(releaseCourt(m, { actor: "admin" })); toast(`Quadra liberada · aquecimento 6:00`); }
     else if (m.status === STATUS.AGUARDANDO_RESULTADO) { dispatch(validateResult(m, { actor: "admin" })); toast("Resultado validado — classificação atualizada"); }
     else onOpenMatch(m.id);
   }
   const actionLabel = s => ({
-    [STATUS.AGUARDANDO_VALIDACAO]: "Validar escalações",
     [STATUS.AGUARDANDO_QUADRA]: "Liberar quadra",
     [STATUS.AGUARDANDO_RESULTADO]: "Validar resultado",
     [STATUS.RESULTADO_CONTESTADO]: "Resolver contestação",
@@ -134,7 +132,6 @@ export function AdminDashboard({ matches, category, categories }) {
 export function AdminMatch({ match, onBack, dispatch, toast }) {
   const [woKind, setWoKind] = useState(null); // 'WO' | 'DESISTENCIA'
   const a = match.a, b = match.b;
-  const anySent = Object.values(match.lineups).some(l => l.status === "enviada");
   const done = isTerminal(match.status);
 
   return (
@@ -183,11 +180,6 @@ export function AdminMatch({ match, onBack, dispatch, toast }) {
         <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 10 }}>
           <Eyebrow>Ações da Organização</Eyebrow>
 
-          {anySent && (
-            <Button full variant="solid" onClick={() => { dispatch(validateLineups(match, { actor: "admin" })); toast("Escalações validadas"); }}>
-              ✓ Validar escalações
-            </Button>
-          )}
           {match.status === STATUS.AGUARDANDO_QUADRA && (
             <Button full onClick={() => { dispatch(releaseCourt(match, { actor: "admin" })); toast("Quadra liberada · aquecimento 6:00"); }}>
               ◇ Liberar quadra (inicia aquecimento)
