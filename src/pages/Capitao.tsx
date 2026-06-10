@@ -8,8 +8,9 @@ import FormInput from "../components/FormInput";
 import StatusPill from "../components/StatusPill";
 import { useTable } from "../lib/useTable";
 import { supabase, supabaseConfigured } from "../lib/supabase";
-import { createAuditLog, createNotification } from "../lib/actions";
-import type { Match, Team } from "../lib/types";
+import { advanceMatchStatus, createAuditLog, createNotification, upsertPresence } from "../lib/actions";
+import { teamSide } from "../lib/engine";
+import type { Match, Presence, Team } from "../lib/types";
 
 const SESSION_KEY = "copa-capitao-team";
 
@@ -155,6 +156,13 @@ function LineupForm({ team, match, onDone }: LineupFormProps) {
       entity: "lineups",
       details: `Confronto ${match.team_a_name} x ${match.team_b_name}`,
     });
+    // Avança a máquina de status: 1 escalação = parcial, 2 = recebidas.
+    const { data: sent } = await supabase
+      .from("lineups")
+      .select("team_id, team_name")
+      .eq("match_id", match.id);
+    const distinctTeams = new Set((sent ?? []).map((l) => l.team_id || l.team_name)).size;
+    await advanceMatchStatus(match, distinctTeams >= 2 ? "Escalações recebidas" : "Escalação parcial");
     setSending(false);
     setFeedback("Escalação enviada com sucesso!");
     onDone();
@@ -165,32 +173,23 @@ function LineupForm({ team, match, onDone }: LineupFormProps) {
     setReadySending(true);
     setError(null);
     setFeedback(null);
-    const now = new Date().toISOString();
-    const { data: existing } = await supabase
-      .from("presence")
-      .select("id")
-      .eq("match_id", match.id)
-      .eq("team_id", team.id)
-      .limit(1);
-    let err = null;
-    if (existing && existing.length > 0) {
-      ({ error: err } = await supabase
-        .from("presence")
-        .update({ captain_ready: true, ready_at: now, updated_at: now })
-        .eq("id", existing[0].id));
-    } else {
-      ({ error: err } = await supabase.from("presence").insert({
-        match_id: match.id,
-        team_id: team.id,
-        team_name: team.team_name,
-        captain_ready: true,
-        ready_at: now,
-      }));
-    }
-    if (err) {
+    const side = teamSide(match, team);
+    if (!side) {
       setReadySending(false);
-      setError(err.message);
+      setError("Sua equipe não está neste confronto.");
       return;
+    }
+    await upsertPresence(match, side, { captain_ready: true });
+    // Os dois capitães prontos → confronto entra em "Aguardando presença" (confirmação do ADM).
+    const { data: rows } = await supabase
+      .from("presence")
+      .select("team_id, team_name, captain_ready")
+      .eq("match_id", match.id);
+    const ready = ((rows ?? []) as Pick<Presence, "team_id" | "team_name" | "captain_ready">[]).filter(
+      (p) => p.captain_ready,
+    );
+    if (new Set(ready.map((p) => p.team_id || p.team_name)).size >= 2) {
+      await advanceMatchStatus(match, "Aguardando presença");
     }
     await createNotification({
       notification_type: "presenca",

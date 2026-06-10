@@ -4,10 +4,13 @@ import Header from "../components/Header";
 import CategoryChips from "../components/CategoryChips";
 import BottomNav from "../components/BottomNav";
 import MatchCard from "../components/MatchCard";
+import MatchDetail from "../components/MatchDetail";
 import CourtCard from "../components/CourtCard";
 import EmptyState from "../components/EmptyState";
 import Button from "../components/Button";
 import FormInput, { FormSelect } from "../components/FormInput";
+import GroupGenerator from "../components/GroupGenerator";
+import StandingsTable from "../components/StandingsTable";
 import { useTable } from "../lib/useTable";
 import { supabase, supabaseConfigured } from "../lib/supabase";
 import { createAuditLog } from "../lib/actions";
@@ -16,8 +19,11 @@ import {
   type AuditLog,
   type Category,
   type Court,
+  type Lineup,
   type Match,
   type Notification,
+  type Presence,
+  type Result,
   type Team,
 } from "../lib/types";
 
@@ -182,9 +188,10 @@ export default function Org() {
   const [tab, setTab] = useState("ops");
   const [category, setCategory] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const { data: matches, refresh: refreshMatches } = useTable<Match>("matches", { pollMs: 10000 });
-  const { data: courts } = useTable<Court>("courts", {
+  const { data: courts, refresh: refreshCourts } = useTable<Court>("courts", {
     orderBy: "court_number",
     ascending: true,
     pollMs: 10000,
@@ -196,11 +203,29 @@ export default function Org() {
   const { data: teams } = useTable<Team>("teams", { orderBy: "team_name", ascending: true });
   const { data: notifications } = useTable<Notification>("notifications", { limit: 50, pollMs: 15000 });
   const { data: auditLogs } = useTable<AuditLog>("audit_logs", { limit: 50, pollMs: 15000 });
+  const { data: lineups, refresh: refreshLineups } = useTable<Lineup>("lineups", { pollMs: 10000 });
+  const { data: presence, refresh: refreshPresence } = useTable<Presence>("presence", { pollMs: 10000 });
+  const { data: results, refresh: refreshResults } = useTable<Result>("results", { pollMs: 10000 });
 
   const filteredMatches = useMemo(
     () => (category ? matches.filter((m) => m.category_name === category) : matches),
     [matches, category],
   );
+
+  function refreshOps() {
+    refreshMatches();
+    refreshCourts();
+    refreshLineups();
+    refreshPresence();
+    refreshResults();
+  }
+
+  // CLASS: grupos da categoria escolhida (ou da primeira com confrontos)
+  const classCategory = category ?? CATEGORY_CHIPS.find((c) => matches.some((m) => m.category_name === c)) ?? null;
+  const classGroups = useMemo(() => {
+    const inCategory = matches.filter((m) => m.category_name === classCategory);
+    return [...new Set(inCategory.map((m) => m.group_or_phase).filter(Boolean))].sort() as string[];
+  }, [matches, classCategory]);
 
   const capitaoLink = `${window.location.origin}${import.meta.env.BASE_URL}capitao`;
   const telaoLink = `${window.location.origin}${import.meta.env.BASE_URL}telao`;
@@ -242,13 +267,37 @@ export default function Org() {
                 message={category ? `Sem confrontos na categoria ${category}.` : "Use o botão Novo confronto para criar o primeiro."}
               />
             ) : (
-              filteredMatches.map((m) => <MatchCard key={m.id} match={m} />)
+              filteredMatches.map((m) => (
+                <div key={m.id} className="space-y-3">
+                  <MatchCard
+                    match={m}
+                    selected={m.id === selectedId}
+                    onClick={() => setSelectedId(m.id === selectedId ? null : m.id)}
+                  />
+                  {m.id === selectedId && (
+                    <MatchDetail
+                      match={m}
+                      courts={courts}
+                      lineups={lineups}
+                      presence={presence}
+                      results={results}
+                      onChanged={refreshOps}
+                    />
+                  )}
+                </div>
+              ))
             )}
           </section>
         )}
 
         {tab === "conf" && (
           <section className="space-y-3">
+            <GroupGenerator
+              categories={categories}
+              teams={teams}
+              matches={matches}
+              onGenerated={refreshMatches}
+            />
             <h2 className="text-lg font-extrabold text-branco-quente">Quadras ao Vivo</h2>
             {courts.length === 0 ? (
               <EmptyState
@@ -267,13 +316,27 @@ export default function Org() {
         )}
 
         {tab === "class" && (
-          <section className="space-y-3">
-            <h2 className="text-lg font-extrabold text-branco-quente">Classificação</h2>
-            <EmptyState
-              icon="📊"
-              title="Classificação"
-              message="Classificação será ativada após lançamento dos resultados."
-            />
+          <section className="space-y-4">
+            <h2 className="text-lg font-extrabold text-branco-quente">
+              Classificação{classCategory ? ` — Cat. ${classCategory}` : ""}
+            </h2>
+            {classGroups.length === 0 ? (
+              <EmptyState
+                icon="📊"
+                title="Sem confrontos nesta categoria"
+                message="Selecione uma categoria com confrontos nos chips acima, ou gere as chaves na aba CONF."
+              />
+            ) : (
+              classGroups.map((group) => (
+                <div key={group} className="space-y-2">
+                  <p className="text-[11px] font-extrabold uppercase tracking-widest text-cream/60">{group}</p>
+                  <StandingsTable
+                    matches={matches.filter((m) => m.category_name === classCategory && m.group_or_phase === group)}
+                    results={results}
+                  />
+                </div>
+              ))
+            )}
           </section>
         )}
 
