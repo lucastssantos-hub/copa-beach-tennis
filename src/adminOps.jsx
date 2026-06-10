@@ -4,7 +4,7 @@
 // validações/liberação/contestação, Notificações e Auditoria.
 // ============================================================================
 import { useState } from "react";
-import { TEAMS, confrontoScore } from "./data.js";
+import { TEAMS, confrontoScore, teamName } from "./data.js";
 import {
   STATUS, courtsFromMatches, courtNames, kpisFromMatches, isTerminal, isLive,
   releaseCourt, warmupToPlay, validateResult, resolveContest, markWalkover,
@@ -125,7 +125,7 @@ export function CentroOperacoes({ matches, category, onOpenMatch, dispatch, toas
               {m ? (
                 <>
                   <div style={{ fontSize: 12.5, fontWeight: 800, color: "#FBF7EE", marginBottom: 6, lineHeight: 1.25 }}>
-                    {TEAMS[m.a].name}<br /><span style={{ color: "#6B2FD9" }}>×</span> {TEAMS[m.b].name}
+                    {teamName(m.a)}<br /><span style={{ color: "#6B2FD9" }}>×</span> {teamName(m.b)}
                   </div>
                   <StatusPill status={m.status} size="sm" />
                   {m.status === STATUS.AQUECIMENTO && m.warmupEndsAt && (
@@ -154,9 +154,9 @@ export function CentroOperacoes({ matches, category, onOpenMatch, dispatch, toas
               <StatusPill status={m.status} size="sm" />
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 11 }}>
-              <Flag code={m.a} size={17} /><span style={{ fontWeight: 700, color: "#FBF7EE", fontSize: 13.5 }}>{TEAMS[m.a].name}</span>
+              <Flag code={m.a} size={17} /><span style={{ fontWeight: 700, color: "#FBF7EE", fontSize: 13.5 }}>{teamName(m.a)}</span>
               <span style={{ color: "#6B2FD9", fontWeight: 800 }}>×</span>
-              <span style={{ fontWeight: 700, color: "#FBF7EE", fontSize: 13.5 }}>{TEAMS[m.b].name}</span><Flag code={m.b} size={17} />
+              <span style={{ fontWeight: 700, color: "#FBF7EE", fontSize: 13.5 }}>{teamName(m.b)}</span><Flag code={m.b} size={17} />
             </div>
 
             {/* Picker de quadra inline para AGUARDANDO_QUADRA */}
@@ -225,7 +225,7 @@ export function AdminMatch({ match, onBack, dispatch, toast, courtCount = 4, all
   return (
     <div style={{ padding: "0 20px 130px", position: "relative" }}>
       <AppBar onBack={onBack} subtitle={`Organização · ${match.court || "Quadra a definir"} · ${match.phase}`}
-        title={`${TEAMS[a].name} vs ${TEAMS[b].name}`} right={<StatusPill status={match.status} size="sm" />} />
+        title={`${teamName(a)} vs ${teamName(b)}`} right={<StatusPill status={match.status} size="sm" />} />
 
       <Scoreboard match={match} />
 
@@ -307,7 +307,7 @@ export function AdminMatch({ match, onBack, dispatch, toast, courtCount = 4, all
                   <Button key={code} full variant="ghost" onClick={() => {
                     dispatch(markWalkover(match, code, woKind, { actor: "admin" }));
                     toast(`${woKind === "WO" ? "W.O." : "Desistência"} registrado`); setWoKind(null);
-                  }}>{TEAMS[code].name}</Button>
+                  }}>{teamName(code)}</Button>
                 ))}
               </div>
               <Button full variant="ghost" onClick={() => setWoKind(null)}>Cancelar</Button>

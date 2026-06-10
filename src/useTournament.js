@@ -6,7 +6,7 @@
 // fica para o backend Supabase — Fase 2.)
 // ============================================================================
 import { useEffect, useRef, useState } from "react";
-import { MATCHES } from "./data.js";
+import { MATCHES, TEAMS } from "./data.js";
 import { STATUS, normalizeMatch, warmupToPlay } from "./engine.js";
 import { hasSupabaseConfig, loadRemoteMatches, saveRemoteMatches } from "./supabaseState.js";
 
@@ -18,12 +18,19 @@ export function cloneSeed() {
 function isValidMatchSet(value) {
   return Array.isArray(value) && value.length > 0 && value.every(m => m.category && m.id);
 }
+// Descarta confrontos cujos códigos de equipe não existem mais em TEAMS (ex.:
+// dado remoto obsoleto após remover uma seleção). Sem isso, um único confronto
+// fantasma quebrava a renderização. Normaliza os que sobram. Dado obsoleto se
+// auto-cura porque o conjunto saneado é re-salvo no localStorage/Supabase.
+function sanitizeMatches(list) {
+  return list.filter(m => TEAMS[m.a] && TEAMS[m.b]).map(normalizeMatch);
+}
 function loadState() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (!saved) return { matches: cloneSeed(), notifications: [], audits: [], courtCount: 4 };
     const parsed = JSON.parse(saved);
-    const matches = isValidMatchSet(parsed.matches) ? parsed.matches.map(normalizeMatch) : cloneSeed();
+    const matches = isValidMatchSet(parsed.matches) ? sanitizeMatches(parsed.matches) : cloneSeed();
     return { matches, notifications: parsed.notifications || [], audits: parsed.audits || [], courtCount: parsed.courtCount || 4 };
   } catch {
     return { matches: cloneSeed(), notifications: [], audits: [], courtCount: 4 };
@@ -63,7 +70,7 @@ export function useTournament({ manageWarmup = false } = {}) {
     loadRemoteMatches()
       .then(remote => {
         if (active && isValidMatchSet(remote)) {
-          const norm = remote.map(normalizeMatch);
+          const norm = sanitizeMatches(remote);
           lastSyncedRef.current = JSON.stringify(norm);
           setMatches(norm);
         }
@@ -80,7 +87,7 @@ export function useTournament({ manageWarmup = false } = {}) {
     const t = setInterval(() => {
       loadRemoteMatches().then(remote => {
         if (!isValidMatchSet(remote)) return;
-        const norm = remote.map(normalizeMatch);
+        const norm = sanitizeMatches(remote);
         const json = JSON.stringify(norm);
         if (json === lastSyncedRef.current) return; // nada novo no servidor
         lastSyncedRef.current = json;
@@ -113,7 +120,7 @@ export function useTournament({ manageWarmup = false } = {}) {
       if (e.key !== STORAGE_KEY || !e.newValue) return;
       try {
         const parsed = JSON.parse(e.newValue);
-        if (isValidMatchSet(parsed.matches)) setMatches(parsed.matches.map(normalizeMatch));
+        if (isValidMatchSet(parsed.matches)) setMatches(sanitizeMatches(parsed.matches));
         setNotifications(parsed.notifications || []);
         setAudits(parsed.audits || []);
       } catch { /* ignore */ }

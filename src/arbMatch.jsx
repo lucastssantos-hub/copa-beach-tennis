@@ -4,7 +4,7 @@
 // (adminOps). A validação de escalação NÃO vive mais aqui (é ação do ADM).
 // ============================================================================
 import { useState } from "react";
-import { TEAMS, athleteName, confrontoScore } from "./data.js";
+import { TEAMS, athleteName, confrontoScore, teamName } from "./data.js";
 import { Flag, Card, Button } from "./components.jsx";
 import { DuoLine } from "./captainMatch.jsx";
 
@@ -16,14 +16,14 @@ export function Scoreboard({ match }) {
       <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 10 }}>
         <div style={{ textAlign: "center" }}>
           <Flag code={match.a} size={30} />
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#FBF7EE", marginTop: 4 }}>{TEAMS[match.a].name}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#FBF7EE", marginTop: 4 }}>{teamName(match.a)}</div>
         </div>
         <div style={{ fontFamily: "'Archivo Black',sans-serif", fontSize: 40, color: "#FBF7EE", lineHeight: 1 }}>
           {s.a}<span style={{ color: "#6B2FD9", margin: "0 6px" }}>×</span>{s.b}
         </div>
         <div style={{ textAlign: "center" }}>
           <Flag code={match.b} size={30} />
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#FBF7EE", marginTop: 4 }}>{TEAMS[match.b].name}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: "#FBF7EE", marginTop: 4 }}>{teamName(match.b)}</div>
         </div>
       </div>
     </Card>
@@ -35,7 +35,6 @@ export function ScoreEditor({ match, gameKey, onSave, onCancel }) {
   const [winner, setWinner] = useState(null);
   const [aGames, setAGames] = useState(6);
   const [bGames, setBGames] = useState(4);
-  const TA = TEAMS[match.a], TB = TEAMS[match.b];
   const winnerGames = winner === match.a ? aGames : bGames;
   const loserGames = winner === match.a ? bGames : aGames;
   const scoreOk = winner && winnerGames > loserGames;
@@ -64,16 +63,16 @@ export function ScoreEditor({ match, gameKey, onSave, onCancel }) {
               background: winner === code ? "rgba(120,200,140,.16)" : "rgba(242,228,201,.05)",
               border: winner === code ? "1.5px solid #5FC97E" : "1.5px solid rgba(242,228,201,.12)" }}>
               <Flag code={code} size={20} />
-              <span style={{ fontSize: 14, fontWeight: 700, color: "#FBF7EE" }}>{TEAMS[code].name}</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: "#FBF7EE" }}>{teamName(code)}</span>
             </button>
           ))}
         </div>
 
         {/* games stepper */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", gap: 12, alignItems: "center", marginBottom: 22 }}>
-          <Stepper label={TA.name} value={aGames} onUp={() => step(setAGames, aGames, 1)} onDown={() => step(setAGames, aGames, -1)} />
+          <Stepper label={teamName(match.a)} value={aGames} onUp={() => step(setAGames, aGames, 1)} onDown={() => step(setAGames, aGames, -1)} />
           <span style={{ fontFamily: "'Archivo Black',sans-serif", fontSize: 18, color: "#8a7d63" }}>×</span>
-          <Stepper label={TB.name} value={bGames} onUp={() => step(setBGames, bGames, 1)} onDown={() => step(setBGames, bGames, -1)} />
+          <Stepper label={teamName(match.b)} value={bGames} onUp={() => step(setBGames, bGames, 1)} onDown={() => step(setBGames, bGames, -1)} />
         </div>
 
         {winner && !scoreOk && (
@@ -120,7 +119,7 @@ export function ArbLineupCol({ match, code }) {
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
         <Flag code={code} size={20} />
-        <span style={{ fontSize: 14, fontWeight: 700, color: "#FBF7EE", flex: 1 }}>{TEAMS[code].name}</span>
+        <span style={{ fontSize: 14, fontWeight: 700, color: "#FBF7EE", flex: 1 }}>{teamName(code)}</span>
       </div>
       {empty ? (
         <div style={{ marginTop: 4, fontSize: 12, color: "#8a7d63", fontStyle: "italic" }}>Escalação não enviada</div>
@@ -174,7 +173,7 @@ export function GameRow({ n, label, game, match, canEdit, onEdit, locked, mista,
         {finished ? (
           <div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 3, fontFamily: "'JetBrains Mono',monospace", fontSize: 11.5 }}>
             <Flag code={game.winner} size={13} />
-            <span style={{ color: "#8FE0A6", fontWeight: 600 }}>{TEAMS[game.winner].name}</span>
+            <span style={{ color: "#8FE0A6", fontWeight: 600 }}>{teamName(game.winner)}</span>
             <span style={{ color: "#C9BBA0" }}>{game.score}</span>
           </div>
         ) : (

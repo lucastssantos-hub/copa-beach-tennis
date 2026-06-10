@@ -1,5 +1,5 @@
 // ============ Área do Capitão (controla a equipe Brasil) ============
-import { TEAMS, confrontoScore } from "./data.js";
+import { TEAMS, confrontoScore, teamName } from "./data.js";
 import { STATUS, isLive } from "./engine.js";
 import { Eyebrow, StatusPill, VersusRow, Button, Card, Flag, AppBar, Countdown } from "./components.jsx";
 
@@ -42,7 +42,7 @@ export function DuoPicker({ label, pool, selected, onPick, locked, gender }) {
 
 // ---------- Captain Home ----------
 export function CaptainHome({ matches, category, onOpenMatch, me }) {
-  const team = TEAMS[me];
+  const team = TEAMS[me] || { name: me, flag: "", women: [], men: [] };
   const mine = matches.filter(m => m.a === me || m.b === me);
   const TERMINAL = [STATUS.FINALIZADO, STATUS.WO, STATUS.DESISTENCIA];
   const active = mine.find(m => isLive(m.status) || m.status === STATUS.AGUARDANDO_RESULTADO || m.status === STATUS.RESULTADO_CONTESTADO);
@@ -74,7 +74,7 @@ export function CaptainHome({ matches, category, onOpenMatch, me }) {
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <Flag code={opp} size={20} />
                 <div>
-                  <div style={{ fontSize: 15, fontWeight: 800, color: "#FBF7EE" }}>vs {TEAMS[opp].name}</div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: "#FBF7EE" }}>vs {teamName(opp)}</div>
                   <div style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: "#C9BBA0", marginTop: 2 }}>{active.court ? `◇ ${active.court} · ` : ""}{active.phase}</div>
                 </div>
               </div>
@@ -172,7 +172,7 @@ export function CaptainHome({ matches, category, onOpenMatch, me }) {
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 12, color: "#8a7d63", width: 38 }}>{m.time}</span>
                     <Flag code={opp} size={18} />
-                    <span style={{ fontSize: 14, fontWeight: 700, color: "#FBF7EE" }}>{TEAMS[opp].name}</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#FBF7EE" }}>{teamName(opp)}</span>
                   </div>
                   <StatusPill status={m.status} size="sm" />
                 </div>

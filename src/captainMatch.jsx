@@ -1,6 +1,6 @@
 // ============ Captain — Match detail / Escalação / Contestação ============
 import { useState } from "react";
-import { TEAMS, athleteName, confrontoScore } from "./data.js";
+import { TEAMS, athleteName, confrontoScore, teamName } from "./data.js";
 import { STATUS, isTerminal, needsMista, saveDraftLineup, submitLineup, submitMista, contestResult } from "./engine.js";
 import { AppBar, Card, StatusPill, Eyebrow, Button, Flag } from "./components.jsx";
 import { DuoPicker } from "./captainHome.jsx";
@@ -9,7 +9,7 @@ export function CaptainMatch({ match, onBack, dispatch, toast, me }) {
   const opp = match.a === me ? match.b : match.a;
   const lineup = match.lineups[me];
   const editable = lineup.status === "pendente" || lineup.status === "rascunho";
-  const team = TEAMS[me];
+  const team = TEAMS[me] || { name: me, flag: "", women: [], men: [] };
 
   const [fem, setFem] = useState(lineup.fem);
   const [masc, setMasc] = useState(lineup.masc);
@@ -53,7 +53,7 @@ export function CaptainMatch({ match, onBack, dispatch, toast, me }) {
 
   return (
     <div style={{ padding: "0 20px 130px" }}>
-      <AppBar onBack={onBack} subtitle={`Categoria ${match.category} · ${match.phase} · ${match.time}`} title={`Brasil vs ${TEAMS[opp].name}`} />
+      <AppBar onBack={onBack} subtitle={`Categoria ${match.category} · ${match.phase} · ${match.time}`} title={`Brasil vs ${teamName(opp)}`} />
 
       {/* match meta */}
       <Card style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "13px 16px" }}>
@@ -190,7 +190,7 @@ export function ResultLine({ game, match }) {
   return (
     <div style={{ marginTop: 4, display: "flex", alignItems: "center", gap: 8, fontFamily: "'JetBrains Mono',monospace", fontSize: 12 }}>
       <Flag code={game.winner} size={14} />
-      <span style={{ color: "#8FE0A6", fontWeight: 600 }}>{TEAMS[game.winner].name} venceu</span>
+      <span style={{ color: "#8FE0A6", fontWeight: 600 }}>{teamName(game.winner)} venceu</span>
       <span style={{ color: "#C9BBA0" }}>{game.score}</span>
     </div>
   );

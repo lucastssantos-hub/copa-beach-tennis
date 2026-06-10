@@ -1,6 +1,6 @@
 // ============ Shared UI primitives ============
-import { useEffect, useState } from "react";
-import { TEAMS, STATUS_META } from "./data.js";
+import { Component, useEffect, useState } from "react";
+import { TEAMS, STATUS_META, teamName } from "./data.js";
 
 // Paleta de tons compartilhada (status pills, badges, bordas)
 export const TONES = {
@@ -127,16 +127,15 @@ export function AppBar({ title, subtitle, right, onBack }) {
 
 // Versus row — two flags + names with optional center
 export function VersusRow({ a, b, center }) {
-  const TA = TEAMS[a], TB = TEAMS[b];
   return (
     <div style={{ display: "grid", gridTemplateColumns: "1fr auto 1fr", alignItems: "center", gap: 10 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
         <Flag code={a} />
-        <span style={{ fontWeight: 700, fontSize: 15, color: "#FBF7EE", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{TA.name}</span>
+        <span style={{ fontWeight: 700, fontSize: 15, color: "#FBF7EE", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{teamName(a)}</span>
       </div>
       <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 12, color: "#8a7d63" }}>{center || "vs"}</div>
       <div style={{ display: "flex", alignItems: "center", gap: 9, minWidth: 0, justifyContent: "flex-end" }}>
-        <span style={{ fontWeight: 700, fontSize: 15, color: "#FBF7EE", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{TB.name}</span>
+        <span style={{ fontWeight: 700, fontSize: 15, color: "#FBF7EE", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{teamName(b)}</span>
         <Flag code={b} />
       </div>
     </div>
@@ -177,6 +176,63 @@ export function Bell({ count = 0, onClick, color = "#E9DEC6" }) {
       )}
     </button>
   );
+}
+
+// Error boundary — impede que um único erro de render (ex.: dado obsoleto do
+// Supabase referenciando uma equipe removida) deixe o app inteiro em tela
+// branca. Mostra um aviso amigável com opções de recuperação.
+export class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+  componentDidCatch(error, info) {
+    console.error("Erro na aplicação:", error, info);
+  }
+  hardReset() {
+    // Remove o estado local que pode estar corrompido/obsoleto e recarrega.
+    try {
+      localStorage.removeItem("copa-beach-tennis-state-v3");
+      localStorage.removeItem("copa-captain-team");
+    } catch { /* ignore */ }
+    window.location.reload();
+  }
+  render() {
+    if (!this.state.error) return this.props.children;
+    return (
+      <div style={{ minHeight: "100vh", background: "#0E0518", display: "grid", placeItems: "center",
+        padding: 24, fontFamily: "'Archivo', sans-serif" }}>
+        <div style={{ maxWidth: 360, width: "100%", textAlign: "center",
+          background: "linear-gradient(160deg, #2a1257 0%, #1B0B44 100%)",
+          border: "1px solid rgba(255,90,78,.3)", borderRadius: 20, padding: "32px 26px",
+          boxShadow: "0 24px 80px -16px rgba(0,0,0,.8)" }}>
+          <div style={{ fontSize: 34, marginBottom: 10 }}>⚠️</div>
+          <div style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: 19, color: "#FBF7EE", marginBottom: 8 }}>
+            Algo deu errado
+          </div>
+          <div style={{ fontSize: 13, color: "#C9BBA0", lineHeight: 1.5, marginBottom: 22 }}>
+            Não foi possível exibir esta tela. Os dados podem estar desatualizados.
+            Tente recarregar — se persistir, restaure os dados.
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <button onClick={() => window.location.reload()} style={{ padding: "13px 0", borderRadius: 13, border: "none",
+              cursor: "pointer", background: "#FF5A4E", color: "#160938",
+              fontFamily: "'Archivo', sans-serif", fontWeight: 800, fontSize: 14 }}>
+              Recarregar
+            </button>
+            <button onClick={() => this.hardReset()} style={{ padding: "12px 0", borderRadius: 13,
+              border: "1.5px solid rgba(242,228,201,.22)", cursor: "pointer", background: "transparent",
+              color: "#E9DEC6", fontFamily: "'Archivo', sans-serif", fontWeight: 700, fontSize: 13 }}>
+              Restaurar dados
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 }
 
 // Toast / banner

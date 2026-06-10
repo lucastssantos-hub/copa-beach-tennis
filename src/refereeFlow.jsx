@@ -4,7 +4,7 @@
 // placar, encerrar e enviar resultado. SEM ações administrativas.
 // ============================================================================
 import { useState } from "react";
-import { TEAMS } from "./data.js";
+import { TEAMS, teamName } from "./data.js";
 import {
   STATUS, needsMista, confrontoDecided,
   releaseCourt, warmupToPlay, setPresence, recordGame, submitResult, submitMista,
@@ -38,7 +38,7 @@ export function RefereeQueue({ matches, category, onOpenMatch }) {
             {c.current ? (
               <>
                 <div style={{ fontSize: 13, fontWeight: 800, color: "#FBF7EE", marginBottom: 6 }}>
-                  {TEAMS[c.current.a].name} <span style={{ color: "#6B2FD9" }}>×</span> {TEAMS[c.current.b].name}
+                  {teamName(c.current.a)} <span style={{ color: "#6B2FD9" }}>×</span> {teamName(c.current.b)}
                 </div>
                 <StatusPill status={c.current.status} size="sm" />
                 {c.current.status === STATUS.AQUECIMENTO && c.current.warmupEndsAt && (
@@ -47,7 +47,7 @@ export function RefereeQueue({ matches, category, onOpenMatch }) {
               </>
             ) : (
               <div style={{ fontSize: 12.5, color: "#6f6387", fontWeight: 700, paddingTop: 4 }}>
-                {c.next ? <>Próximo · {c.next.time}<br />{TEAMS[c.next.a].name} × {TEAMS[c.next.b].name}</> : "Livre"}
+                {c.next ? <>Próximo · {c.next.time}<br />{teamName(c.next.a)} × {teamName(c.next.b)}</> : "Livre"}
               </div>
             )}
           </Card>
@@ -66,9 +66,9 @@ export function RefereeQueue({ matches, category, onOpenMatch }) {
               <StatusPill status={m.status} size="sm" />
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Flag code={m.a} size={18} /><span style={{ fontWeight: 700, color: "#FBF7EE", fontSize: 14 }}>{TEAMS[m.a].name}</span>
+              <Flag code={m.a} size={18} /><span style={{ fontWeight: 700, color: "#FBF7EE", fontSize: 14 }}>{teamName(m.a)}</span>
               <span style={{ color: "#6B2FD9", fontWeight: 800 }}>×</span>
-              <span style={{ fontWeight: 700, color: "#FBF7EE", fontSize: 14 }}>{TEAMS[m.b].name}</span><Flag code={m.b} size={18} />
+              <span style={{ fontWeight: 700, color: "#FBF7EE", fontSize: 14 }}>{teamName(m.b)}</span><Flag code={m.b} size={18} />
             </div>
           </Card>
         ))}
@@ -98,8 +98,9 @@ export function RefereeMatch({ match, onBack, dispatch, toast }) {
   function fillMista() {
     let next = { match };
     Object.keys(match.lineups).forEach(code => {
-      if (!match.lineups[code].mista) {
-        next = submitMista(next.match, code, { w: TEAMS[code].women[0].id, m: TEAMS[code].men[0].id });
+      const t = TEAMS[code];
+      if (t && !match.lineups[code].mista) {
+        next = submitMista(next.match, code, { w: t.women[0].id, m: t.men[0].id });
       }
     });
     dispatch(next);
@@ -109,7 +110,7 @@ export function RefereeMatch({ match, onBack, dispatch, toast }) {
   return (
     <div style={{ padding: "0 20px 130px", position: "relative" }}>
       <AppBar onBack={onBack} subtitle={`Mesário${match.court ? ` · ${match.court}` : ""}`}
-        title={`${TEAMS[a].name} vs ${TEAMS[b].name}`} right={<StatusPill status={match.status} size="sm" />} />
+        title={`${teamName(a)} vs ${teamName(b)}`} right={<StatusPill status={match.status} size="sm" />} />
 
       <Scoreboard match={match} />
 
@@ -123,7 +124,7 @@ export function RefereeMatch({ match, onBack, dispatch, toast }) {
                 background: match.presence[code] ? "rgba(120,200,140,.16)" : "rgba(242,228,201,.05)",
                 border: match.presence[code] ? "1.5px solid #5FC97E" : "1.5px solid rgba(242,228,201,.12)" }}>
               <Flag code={code} size={18} />
-              <span style={{ fontWeight: 700, color: "#FBF7EE", fontSize: 13.5, flex: 1, textAlign: "left" }}>{TEAMS[code].name}</span>
+              <span style={{ fontWeight: 700, color: "#FBF7EE", fontSize: 13.5, flex: 1, textAlign: "left" }}>{teamName(code)}</span>
               <span style={{ fontSize: 16, color: match.presence[code] ? "#5FC97E" : "#6f6387" }}>{match.presence[code] ? "✓" : "○"}</span>
             </button>
           ))}

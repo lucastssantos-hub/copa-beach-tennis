@@ -26,7 +26,10 @@ function getInitialTeam() {
     localStorage.setItem(TEAM_KEY, fromUrl);
     return fromUrl;
   }
-  return localStorage.getItem(TEAM_KEY) || null;
+  // Só restaura do localStorage se a equipe ainda existir (uma seleção removida
+  // não pode deixar o capitão preso numa identidade inválida).
+  const stored = localStorage.getItem(TEAM_KEY);
+  return stored && TEAMS[stored] ? stored : null;
 }
 
 export default function CaptainApp() {

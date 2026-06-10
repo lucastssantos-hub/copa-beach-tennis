@@ -1,5 +1,5 @@
 // ============ Classificação (standings) — shared ============
-import { TEAMS, confrontoScore } from "./data.js";
+import { TEAMS, confrontoScore, teamName } from "./data.js";
 import { isTerminal } from "./engine.js";
 import { Flag, AppBar, Eyebrow, Card } from "./components.jsx";
 
@@ -67,7 +67,7 @@ export function Classificacao({ matches, highlight, group = "Grupo 1" }) {
                 color: qualifies ? "#5FC97E" : "#8a7d63" }}>{i + 1}</span>
               <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                 <Flag code={r.code} size={16} />
-                <span style={{ fontSize: 13, fontWeight: 700, color: "#FBF7EE", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{TEAMS[r.code].name}</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: "#FBF7EE", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{teamName(r.code)}</span>
               </div>
               <span style={{ textAlign: "center", fontFamily: "'JetBrains Mono',monospace", fontSize: 13, color: "#FBF7EE", fontWeight: 600 }}>{r.v}</span>
               <span style={{ textAlign: "center", fontFamily: "'JetBrains Mono',monospace", fontSize: 13, color: "#C9BBA0" }}>{r.d}</span>
@@ -131,7 +131,7 @@ export function CaptainHistory({ matches, category, me }) {
                   <div>
                     <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
                       <Flag code={opp} size={16} />
-                      <span style={{ fontSize: 14, fontWeight: 700, color: "#FBF7EE" }}>{TEAMS[opp].name}</span>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: "#FBF7EE" }}>{teamName(opp)}</span>
                     </div>
                     <div style={{ fontSize: 11, color: "#8a7d63", marginTop: 2 }}>{m.phase} · {m.time}</div>
                   </div>

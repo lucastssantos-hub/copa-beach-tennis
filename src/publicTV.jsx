@@ -2,7 +2,7 @@
 // publicTV.jsx — Tela Pública (projetável em TV). Sem login. Fullscreen landscape.
 // ============================================================================
 import { useEffect, useState } from "react";
-import { TEAMS, EVENT, confrontoScore } from "./data.js";
+import { TEAMS, EVENT, confrontoScore, teamName } from "./data.js";
 import { STATUS, isLive, isTerminal } from "./engine.js";
 import { Flag, StatusPill, Countdown } from "./components.jsx";
 import { computeStandings } from "./standings.jsx";
@@ -104,7 +104,7 @@ export function PublicTV({ matches, category }) {
                     <span style={{ fontFamily: "'Archivo Black',sans-serif", fontSize: "clamp(12px,1vw,16px)", color: i < 2 ? "#5FC97E" : "#8a7d63" }}>{i + 1}</span>
                     <span style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
                       <Flag code={r.code} size={15} />
-                      <span style={{ fontWeight: 700, fontSize: "clamp(12px,1vw,16px)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{TEAMS[r.code].name}</span>
+                      <span style={{ fontWeight: 700, fontSize: "clamp(12px,1vw,16px)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{teamName(r.code)}</span>
                     </span>
                     <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "clamp(11px,.9vw,15px)", color: "#FBF7EE", fontWeight: 700 }}>{r.v}V</span>
                     <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: "clamp(11px,.9vw,15px)", color: (r.games - r.gc) >= 0 ? "#8FE0A6" : "#FF8478" }}>{r.games - r.gc > 0 ? "+" : ""}{r.games - r.gc}</span>
@@ -140,9 +140,9 @@ function Row({ children }) {
 function MiniVs({ a, b }) {
   return (
     <span style={{ display: "flex", alignItems: "center", gap: 7, flex: 1, minWidth: 0 }}>
-      <Flag code={a} size={16} /><b style={{ fontSize: "clamp(12px,1vw,16px)" }}>{TEAMS[a].name}</b>
+      <Flag code={a} size={16} /><b style={{ fontSize: "clamp(12px,1vw,16px)" }}>{teamName(a)}</b>
       <span style={{ color: "#6B2FD9", fontWeight: 800 }}>×</span>
-      <b style={{ fontSize: "clamp(12px,1vw,16px)" }}>{TEAMS[b].name}</b><Flag code={b} size={16} />
+      <b style={{ fontSize: "clamp(12px,1vw,16px)" }}>{teamName(b)}</b><Flag code={b} size={16} />
     </span>
   );
 }
@@ -150,7 +150,7 @@ function TeamBig({ code, align }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: align === "right" ? "flex-end" : "flex-start", gap: 6 }}>
       <Flag code={code} size={34} />
-      <span style={{ fontWeight: 800, fontSize: "clamp(14px,1.3vw,22px)" }}>{TEAMS[code].name}</span>
+      <span style={{ fontWeight: 800, fontSize: "clamp(14px,1.3vw,22px)" }}>{teamName(code)}</span>
     </div>
   );
 }

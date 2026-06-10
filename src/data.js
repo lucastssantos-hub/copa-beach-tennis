@@ -165,6 +165,12 @@ export function athleteName(code, id) {
   return (all.find(a => a.id === id) || {}).name || "—";
 }
 
+// Nome da equipe tolerante a códigos desconhecidos/obsoletos (ex.: confronto
+// remoto contra uma seleção já removida). Nunca lança — cai no próprio código.
+export function teamName(code) {
+  return TEAMS[code]?.name ?? code ?? "—";
+}
+
 export function categoryMeta(categoryId) {
   return CATEGORIES.find(c => c.id === categoryId) || CATEGORIES[0];
 }
