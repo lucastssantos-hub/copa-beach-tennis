@@ -12,7 +12,7 @@ import {
   sideTeamName,
   type GameType,
 } from "./engine";
-import type { Court, Match, MatchStatus, Result } from "./types";
+import type { Court, Match, MatchStatus, Result, Team } from "./types";
 
 export async function createNotification(input: {
   notification_type: string;
@@ -72,6 +72,76 @@ export async function upsertPresence(
       ...stamp,
     });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Escalação do capitão (rascunho ou envio definitivo)
+// ---------------------------------------------------------------------------
+export interface LineupPlayers {
+  female_player_1: string;
+  female_player_2: string;
+  male_player_1: string;
+  male_player_2: string;
+  mixed_player_1: string;
+  mixed_player_2: string;
+}
+
+/**
+ * Salva a escalação da equipe no confronto (upsert por match+team).
+ * status 'Enviada' trava a escalação, notifica a organização e avança o fluxo;
+ * 'Rascunho' apenas persiste para continuar depois.
+ */
+export async function saveLineup(
+  match: Match,
+  team: Team,
+  players: LineupPlayers,
+  status: "Rascunho" | "Enviada",
+): Promise<string | null> {
+  if (!supabase) return "Supabase não configurado.";
+  const row = {
+    match_id: match.id,
+    category_name: match.category_name,
+    round: match.round,
+    team_id: team.id,
+    team_name: team.team_name,
+    captain_name: team.captain_name,
+    ...players,
+    lineup_status: status,
+    submitted_at: status === "Enviada" ? now() : null,
+    updated_at: now(),
+  };
+  let query = supabase.from("lineups").select("id").eq("match_id", match.id).limit(1);
+  query = team.id ? query.eq("team_id", team.id) : query.eq("team_name", team.team_name);
+  const { data: existing } = await query;
+  const { error } =
+    existing && existing.length > 0
+      ? await supabase.from("lineups").update(row).eq("id", existing[0].id)
+      : await supabase.from("lineups").insert(row);
+  if (error) return error.message;
+  if (status === "Rascunho") return null;
+
+  await createNotification({
+    notification_type: "escalacao",
+    message: `${team.team_name} enviou escalação`,
+    team_id: team.id,
+    team_name: team.team_name,
+    match_id: match.id,
+  });
+  await createAuditLog({
+    actor: `CAPITAO:${team.team_name}`,
+    action: "ENVIAR_ESCALACAO",
+    entity: "lineups",
+    details: `Confronto ${match.team_a_name} x ${match.team_b_name}`,
+  });
+  // Avança a máquina de status: 1 escalação enviada = parcial, 2 = recebidas.
+  const { data: sent } = await supabase
+    .from("lineups")
+    .select("team_id, team_name")
+    .eq("match_id", match.id)
+    .eq("lineup_status", "Enviada");
+  const distinctTeams = new Set((sent ?? []).map((l) => l.team_id || l.team_name)).size;
+  await advanceMatchStatus(match, distinctTeams >= 2 ? "Escalações recebidas" : "Escalação parcial");
+  return null;
 }
 
 /** ADM confirma a presença de um lado; avança o status quando os dois confirmam. */

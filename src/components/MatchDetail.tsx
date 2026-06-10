@@ -388,7 +388,7 @@ export default function MatchDetail({ match, courts, lineups, presence, results,
         {lineupRows.map(({ side, name, lineup }) => (
           <div key={side} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
             <span className="text-sm font-bold text-branco-quente">{name}</span>
-            <StatusPill status={lineup ? "Enviada" : "Pendente"} />
+            <StatusPill status={lineup?.lineup_status === "Enviada" ? "Enviada" : lineup ? "Rascunho" : "Pendente"} />
           </div>
         ))}
       </div>

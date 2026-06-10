@@ -18,6 +18,7 @@ const STATUS_COLORS: Record<string, string> = {
   Ocupada: "bg-coral/20 text-coral border-coral/40",
   // lineups / results
   Pendente: "bg-white/10 text-cream/80 border-white/15",
+  Rascunho: "bg-amber-400/15 text-amber-300 border-amber-400/30",
   Enviada: "bg-emerald-400/15 text-emerald-300 border-emerald-400/30",
 };
 

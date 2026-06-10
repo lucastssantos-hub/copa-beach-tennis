@@ -61,6 +61,7 @@ function SideStatus({
   onPoke: (side: Side) => void;
 }) {
   const lineup = sideLineup(match, lineups, side);
+  const lineupSent = lineup?.lineup_status === "Enviada";
   const p = sidePresence(match, presence, side);
   const flag = side === "a" ? match.team_a_flag : match.team_b_flag;
   const abbr =
@@ -81,7 +82,7 @@ function SideStatus({
         )}
       </div>
       <div className="flex items-center gap-1">
-        <Chip ok={!!lineup} label="Esc." />
+        <Chip ok={lineupSent} label="Esc." />
         <Chip ok={confirmed} label="Pres." />
       </div>
       <div className="flex items-center gap-1">
@@ -98,7 +99,7 @@ function SideStatus({
             {busy === `pres-${side}` ? "…" : "Confirmar"}
           </button>
         )}
-        {!lineup && (
+        {!lineupSent && (
           <button
             type="button"
             disabled={busy !== null}
