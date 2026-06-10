@@ -42,6 +42,19 @@ select c from (values ('A'), ('B'), ('C'), ('D'), ('E'), ('35+'), ('60+')) as v(
 where not exists (select 1 from categories where category_name = v.c);
 
 -- ------------------------------------------------------------
+-- Atletas (elenco por seleção — seletor de escalação do capitão)
+-- ------------------------------------------------------------
+create table if not exists athletes (
+  id uuid primary key default gen_random_uuid(),
+  team_id uuid,
+  team_name text,
+  athlete_name text not null,
+  gender text not null check (gender in ('Feminino', 'Masculino')),
+  created_at timestamp default now(),
+  updated_at timestamp default now()
+);
+
+-- ------------------------------------------------------------
 -- Confrontos
 -- ------------------------------------------------------------
 create table if not exists matches (
@@ -186,7 +199,7 @@ create table if not exists audit_logs (
 do $$
 declare t text;
 begin
-  foreach t in array array['teams','categories','matches','lineups','presence','courts','results','notifications','audit_logs']
+  foreach t in array array['teams','categories','athletes','matches','lineups','presence','courts','results','notifications','audit_logs']
   loop
     execute format('alter table %I enable row level security', t);
     if not exists (

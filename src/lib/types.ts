@@ -11,6 +11,16 @@ export interface Team {
   updated_at: string;
 }
 
+export interface Athlete {
+  id: string;
+  team_id: string | null;
+  team_name: string | null;
+  athlete_name: string;
+  gender: "Feminino" | "Masculino";
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Category {
   id: string;
   category_name: string;

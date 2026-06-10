@@ -3,7 +3,7 @@ import AppShell from "../components/AppShell";
 import Header from "../components/Header";
 import EmptyState from "../components/EmptyState";
 import Button from "../components/Button";
-import FormInput from "../components/FormInput";
+import FormInput, { FormSelect } from "../components/FormInput";
 import StatusPill from "../components/StatusPill";
 import { useTable } from "../lib/useTable";
 import { supabase, supabaseConfigured } from "../lib/supabase";
@@ -26,7 +26,7 @@ import {
   teamSide,
   winnerSide,
 } from "../lib/engine";
-import type { Lineup, Match, Presence, Result, Team } from "../lib/types";
+import type { Athlete, Lineup, Match, Presence, Result, Team } from "../lib/types";
 
 const SESSION_KEY = "copa-capitao-team";
 const WARMUP_KEY = "copa-capitao-warmup";
@@ -222,12 +222,46 @@ function GameCell({ label, result, match }: { label: string; result: Result | nu
   );
 }
 
+// Campo de atleta: seletor com o elenco da seleção; vira texto livre se a
+// seleção ainda não tiver atletas cadastrados.
+function AthleteField({
+  label,
+  value,
+  options,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  disabled?: boolean;
+  onChange: (value: string) => void;
+}) {
+  if (options.length === 0) {
+    return (
+      <FormInput label={label} value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} />
+    );
+  }
+  const all = value && !options.includes(value) ? [value, ...options] : options;
+  return (
+    <FormSelect label={label} value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}>
+      <option value="">— Selecionar —</option>
+      {all.map((name) => (
+        <option key={name} value={name}>
+          {name}
+        </option>
+      ))}
+    </FormSelect>
+  );
+}
+
 function CaptainMatchView({
   team,
   match,
   lineups,
   presence,
   results,
+  athletes,
   onBack,
   onChanged,
   onSent,
@@ -237,6 +271,7 @@ function CaptainMatchView({
   lineups: Lineup[];
   presence: Presence[];
   results: Result[];
+  athletes: Athlete[];
   onBack: () => void;
   onChanged: () => void;
   onSent: () => void;
@@ -349,15 +384,28 @@ function CaptainMatchView({
     onChanged();
   }
 
-  const lineupFields: Array<{ title: string; a: keyof LineupPlayers; b: keyof LineupPlayers; dim?: boolean }> = [
-    { title: "Dupla feminina", a: "female_player_1", b: "female_player_2" },
-    { title: "Dupla masculina", a: "male_player_1", b: "male_player_2" },
+  const femininas = athletes.filter((a) => a.gender === "Feminino").map((a) => a.athlete_name);
+  const masculinos = athletes.filter((a) => a.gender === "Masculino").map((a) => a.athlete_name);
+
+  // Mista: atleta 1 do feminino, atleta 2 do masculino.
+  const lineupFields: Array<{
+    title: string;
+    a: keyof LineupPlayers;
+    b: keyof LineupPlayers;
+    optionsA: string[];
+    optionsB: string[];
+    dim?: boolean;
+  }> = [
+    { title: "Dupla feminina", a: "female_player_1", b: "female_player_2", optionsA: femininas, optionsB: femininas },
+    { title: "Dupla masculina", a: "male_player_1", b: "male_player_2", optionsA: masculinos, optionsB: masculinos },
     {
       title: mistaNeeded
         ? "Dupla mista (necessária — confronto 1×1)"
         : "Dupla mista — se necessário (apenas se o confronto ficar 1×1)",
       a: "mixed_player_1",
       b: "mixed_player_2",
+      optionsA: femininas,
+      optionsB: masculinos,
       dim: !mistaNeeded,
     },
   ];
@@ -429,12 +477,12 @@ function CaptainMatchView({
             <p className="text-sm font-extrabold uppercase tracking-wide text-coral">Sua escalação</p>
             <StatusPill status={myLineup ? myLineup.lineup_status : "Pendente"} />
           </div>
-          {lineupFields.map(({ title, a, b, dim }) => (
+          {lineupFields.map(({ title, a, b, optionsA, optionsB, dim }) => (
             <div key={a} className={dim && !locked ? "opacity-50" : ""}>
               <p className="mb-1 text-[11px] font-extrabold uppercase tracking-widest text-cream/60">{title}</p>
               <div className="grid grid-cols-2 gap-3">
-                <FormInput label="Atleta 1" value={players[a]} onChange={(e) => setPlayer(a, e.target.value)} disabled={locked} />
-                <FormInput label="Atleta 2" value={players[b]} onChange={(e) => setPlayer(b, e.target.value)} disabled={locked} />
+                <AthleteField label="Atleta 1" value={players[a]} options={optionsA} disabled={locked} onChange={(v) => setPlayer(a, v)} />
+                <AthleteField label="Atleta 2" value={players[b]} options={optionsB} disabled={locked} onChange={(v) => setPlayer(b, v)} />
               </div>
             </div>
           ))}
@@ -514,6 +562,7 @@ function CaptainPanel({ team, onLogout }: { team: Team; onLogout: () => void }) 
   const { data: lineups, refresh: refreshLineups } = useTable<Lineup>("lineups", { pollMs: 15000 });
   const { data: presence, refresh: refreshPresence } = useTable<Presence>("presence", { pollMs: 15000 });
   const { data: results, refresh: refreshResults } = useTable<Result>("results", { pollMs: 15000 });
+  const { data: athletes } = useTable<Athlete>("athletes", { pollMs: 60000 });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [warmup, setWarmup] = useState<Warmup | null>(loadWarmup);
   const [warmupOpen, setWarmupOpen] = useState(false);
@@ -587,6 +636,9 @@ function CaptainPanel({ team, onLogout }: { team: Team; onLogout: () => void }) 
               lineups={lineups}
               presence={presence}
               results={results}
+              athletes={athletes.filter(
+                (a) => a.team_id === team.id || a.team_name === team.team_name,
+              )}
               onBack={() => setSelectedId(null)}
               onChanged={refresh}
               onSent={() => startWarmup(selected.id)}
