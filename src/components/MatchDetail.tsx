@@ -10,7 +10,9 @@ import StatusPill from "./StatusPill";
 import {
   advanceMatchStatus,
   recordGameResult,
+  recordWalkover,
   releaseCourts,
+  resolveContest,
   startMatch,
   upsertPresence,
 } from "../lib/actions";
@@ -285,6 +287,91 @@ function ResultsBlock({ match, results, onChanged }: { match: Match; results: Re
   );
 }
 
+// ---------------- Contestação (Fase 3) ----------------
+function ContestResolveBlock({ match, onChanged }: { match: Match; onChanged: () => void }) {
+  const [busy, setBusy] = useState<"manter" | "reabrir" | null>(null);
+
+  async function resolve(decision: "manter" | "reabrir") {
+    setBusy(decision);
+    await resolveContest(match, decision);
+    setBusy(null);
+    onChanged();
+  }
+
+  return (
+    <div className="space-y-2">
+      <SectionTitle>Resultado contestado</SectionTitle>
+      <p className="rounded-2xl border border-rose-400/30 bg-rose-400/10 px-3 py-2.5 text-sm font-bold text-rose-300">
+        ⚠ Motivo do capitão: <span className="font-semibold text-rose-200">{match.contest_reason || "sem detalhes"}</span>
+      </p>
+      <div className="flex gap-2">
+        <Button className="flex-1" disabled={busy !== null} onClick={() => resolve("manter")}>
+          {busy === "manter" ? "…" : "✓ Manter resultado"}
+        </Button>
+        <Button variant="secondary" className="flex-1" disabled={busy !== null} onClick={() => resolve("reabrir")}>
+          {busy === "reabrir" ? "…" : "↺ Reabrir confronto"}
+        </Button>
+      </div>
+      <p className="text-[11px] font-bold text-cream/40">
+        Reabrir apaga as parciais lançadas — o confronto volta para "Em andamento".
+      </p>
+    </div>
+  );
+}
+
+// ---------------- W.O. / Desistência (Fase 3) ----------------
+function WalkoverBlock({ match, results, onChanged }: { match: Match; results: Result[]; onChanged: () => void }) {
+  const [kind, setKind] = useState<"W.O." | "Desistência" | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function confirm(winner: "a" | "b") {
+    if (!kind) return;
+    setBusy(true);
+    await recordWalkover(match, kind, winner, results);
+    setBusy(false);
+    setKind(null);
+    onChanged();
+  }
+
+  return (
+    <div className="space-y-2 border-t border-white/10 pt-3">
+      <SectionTitle>Encerramento administrativo</SectionTitle>
+      {!kind ? (
+        <div className="flex gap-2">
+          <Button variant="ghost" className="flex-1 !text-rose-300" onClick={() => setKind("W.O.")}>
+            Marcar W.O.
+          </Button>
+          <Button variant="ghost" className="flex-1 !text-rose-300" onClick={() => setKind("Desistência")}>
+            Desistência
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-2 rounded-2xl border border-rose-400/30 bg-rose-400/10 p-3">
+          <p className="text-xs font-extrabold uppercase tracking-wider text-rose-300">
+            {kind} — quem é o vencedor?
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {(["a", "b"] as const).map((side) => (
+              <button
+                key={side}
+                type="button"
+                disabled={busy}
+                onClick={() => confirm(side)}
+                className="rounded-xl border border-white/15 bg-white/5 px-2 py-2 text-xs font-extrabold text-cream/80 transition active:scale-[0.98]"
+              >
+                {(side === "a" ? match.team_a_flag : match.team_b_flag) || ""} {sideTeamName(match, side)}
+              </button>
+            ))}
+          </div>
+          <Button variant="ghost" full disabled={busy} onClick={() => setKind(null)}>
+            Cancelar
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------------- Painel ----------------
 export default function MatchDetail({ match, courts, lineups, presence, results, onChanged }: MatchDetailProps) {
   const status = match.match_status;
@@ -301,7 +388,9 @@ export default function MatchDetail({ match, courts, lineups, presence, results,
   const showRelease = status === "Pronto para quadra";
   const showStart = status === "Liberado para quadra";
   const showResults = status === "Em andamento";
-  const finished = status === "Finalizado";
+  const contested = status === "Resultado contestado";
+  const walkover = status === "W.O." || status === "Desistência";
+  const finished = status === "Finalizado" || contested || walkover;
 
   return (
     <div className="animate-fade-in-up space-y-4 rounded-3xl border border-coral/40 bg-white/[0.05] p-4">
@@ -361,9 +450,11 @@ export default function MatchDetail({ match, courts, lineups, presence, results,
 
       {showResults && <ResultsBlock match={match} results={results} onChanged={onChanged} />}
 
+      {contested && <ContestResolveBlock match={match} onChanged={onChanged} />}
+
       {finished && (
         <div className="space-y-2">
-          <SectionTitle>Resultado final</SectionTitle>
+          <SectionTitle>{walkover ? `Resultado final — ${status}` : "Resultado final"}</SectionTitle>
           <p className="font-display text-2xl text-branco-quente">
             {match.score_team_a} × {match.score_team_b}
           </p>
@@ -381,6 +472,9 @@ export default function MatchDetail({ match, courts, lineups, presence, results,
           })}
         </div>
       )}
+
+      {/* W.O. / Desistência: disponível enquanto o confronto não terminou em quadra */}
+      {!finished && <WalkoverBlock match={match} results={results} onChanged={onChanged} />}
     </div>
   );
 }

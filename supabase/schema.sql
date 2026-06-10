@@ -65,6 +65,7 @@ create table if not exists matches (
   score_team_b integer default 0,
   match_mode text default 'Sequencial',
   mixed_required boolean default false,
+  contest_reason text,
   created_at timestamp default now(),
   updated_at timestamp default now()
 );
@@ -73,6 +74,7 @@ create table if not exists matches (
 --   Aguardando escalação | Escalação parcial | Escalações recebidas
 --   Aguardando presença | Pronto para quadra | Liberado para quadra
 --   Em andamento | Resultado pendente | Finalizado
+--   Resultado contestado | W.O. | Desistência  (fase 3)
 
 -- ------------------------------------------------------------
 -- Escalações

@@ -9,6 +9,9 @@ const STATUS_COLORS: Record<string, string> = {
   "Em andamento": "bg-coral/20 text-coral border-coral/40",
   "Resultado pendente": "bg-violet-400/15 text-violet-300 border-violet-400/30",
   Finalizado: "bg-white/8 text-cream/60 border-white/10",
+  "Resultado contestado": "bg-rose-400/15 text-rose-300 border-rose-400/30",
+  "W.O.": "bg-rose-400/15 text-rose-300 border-rose-400/30",
+  Desistência: "bg-rose-400/15 text-rose-300 border-rose-400/30",
   // courts
   Livre: "bg-emerald-400/15 text-emerald-300 border-emerald-400/30",
   Escape: "bg-violet-400/15 text-violet-300 border-violet-400/30",

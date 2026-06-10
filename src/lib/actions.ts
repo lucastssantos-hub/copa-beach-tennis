@@ -224,6 +224,123 @@ export async function recordGameResult(
 }
 
 // ---------------------------------------------------------------------------
+// Contestação de resultado (Fase 3)
+// ---------------------------------------------------------------------------
+/** Capitão contesta um confronto finalizado — motivo obrigatório. */
+export async function contestResult(match: Match, reason: string, teamName: string) {
+  if (!supabase || match.match_status !== "Finalizado" || !reason.trim()) return;
+  await supabase
+    .from("matches")
+    .update({ match_status: "Resultado contestado", contest_reason: reason.trim(), updated_at: now() })
+    .eq("id", match.id);
+  await createNotification({
+    notification_type: "contestacao",
+    message: `⚠ ${teamName} contestou o resultado de ${matchLabel(match)}: ${reason.trim()}`,
+    team_name: teamName,
+    match_id: match.id,
+  });
+  await createAuditLog({
+    actor: `CAPITAO:${teamName}`,
+    action: "CONTESTAR_RESULTADO",
+    entity: "matches",
+    details: `${matchLabel(match)} — ${reason.trim()}`,
+  });
+}
+
+/** ADM resolve a contestação: 'manter' valida o resultado; 'reabrir' apaga as parciais e volta o jogo. */
+export async function resolveContest(match: Match, decision: "manter" | "reabrir", actor = "ORG") {
+  if (!supabase || match.match_status !== "Resultado contestado") return;
+  if (decision === "manter") {
+    await supabase
+      .from("matches")
+      .update({ match_status: "Finalizado", contest_reason: null, updated_at: now() })
+      .eq("id", match.id);
+  } else {
+    await supabase.from("results").delete().eq("match_id", match.id);
+    await supabase
+      .from("matches")
+      .update({
+        match_status: "Em andamento",
+        contest_reason: null,
+        score_team_a: 0,
+        score_team_b: 0,
+        mixed_required: false,
+        updated_at: now(),
+      })
+      .eq("id", match.id);
+  }
+  await createNotification({
+    notification_type: "contestacao",
+    message:
+      decision === "manter"
+        ? `${matchLabel(match)}: contestação resolvida — resultado mantido`
+        : `${matchLabel(match)}: confronto reaberto para relançar as parciais`,
+    match_id: match.id,
+  });
+  await createAuditLog({
+    actor,
+    action: decision === "manter" ? "MANTER_RESULTADO" : "REABRIR_CONFRONTO",
+    entity: "matches",
+    details: matchLabel(match),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// W.O. / Desistência (Fase 3) — placar sintético 2×0 para a classificação
+// ---------------------------------------------------------------------------
+export async function recordWalkover(
+  match: Match,
+  kind: "W.O." | "Desistência",
+  winner: "a" | "b",
+  existingResults: Result[],
+  actor = "ORG",
+) {
+  if (!supabase) return;
+  const scoreLabel = kind === "W.O." ? "W.O." : "Desist.";
+  for (const gameType of ["Feminino", "Masculino"] as GameType[]) {
+    const row = {
+      match_id: match.id,
+      game_type: gameType,
+      winner_team_id: sideTeamId(match, winner),
+      winner_team_name: sideTeamName(match, winner),
+      score: scoreLabel,
+      result_status: "Validado",
+      submitted_by: actor,
+      finished_at: now(),
+      updated_at: now(),
+    };
+    const existing = existingResults.find((r) => r.match_id === match.id && r.game_type === gameType);
+    if (existing) {
+      await supabase.from("results").update(row).eq("id", existing.id);
+    } else {
+      await supabase.from("results").insert(row);
+    }
+  }
+  await supabase
+    .from("matches")
+    .update({
+      match_status: kind,
+      contest_reason: null,
+      score_team_a: winner === "a" ? 2 : 0,
+      score_team_b: winner === "b" ? 2 : 0,
+      updated_at: now(),
+    })
+    .eq("id", match.id);
+  await freeCourtsOf(match);
+  await createNotification({
+    notification_type: "alerta",
+    message: `${kind} em ${matchLabel(match)} — vitória de ${sideTeamName(match, winner)}`,
+    match_id: match.id,
+  });
+  await createAuditLog({
+    actor,
+    action: kind === "W.O." ? "REGISTRAR_WO" : "REGISTRAR_DESISTENCIA",
+    entity: "matches",
+    details: `${matchLabel(match)} — vencedor ${sideTeamName(match, winner)}`,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Geração de chaves
 // ---------------------------------------------------------------------------
 export async function insertGeneratedMatches(

@@ -22,12 +22,22 @@ const STATUS_ORDER: MatchStatus[] = [
   "Finalizado",
 ];
 
+// Status fora do fluxo normal (Fase 3): contestação e encerramentos administrativos.
+export const TERMINAL_STATUSES: MatchStatus[] = ["Finalizado", "W.O.", "Desistência"];
+
+/** Confronto encerrado (resultado em quadra, W.O. ou desistência) — conta para a classificação. */
+export function isTerminal(s: MatchStatus): boolean {
+  return TERMINAL_STATUSES.includes(s);
+}
+
 export function statusRank(s: MatchStatus): number {
   return STATUS_ORDER.indexOf(s);
 }
 
 /** true se `next` avança o fluxo em relação ao status atual. */
 export function isForward(current: MatchStatus, next: MatchStatus): boolean {
+  // Fora do fluxo (contestado, W.O., desistência) nada avança por ação atrasada.
+  if (statusRank(current) === -1) return false;
   return statusRank(next) > statusRank(current);
 }
 
@@ -139,7 +149,7 @@ export function computeStandings(matches: Match[], results: Result[]): StandingR
   matches.forEach((m) => ensure(m, "a") && ensure(m, "b"));
 
   matches
-    .filter((m) => m.match_status === "Finalizado")
+    .filter((m) => isTerminal(m.match_status))
     .forEach((m) => {
       const a = ensure(m, "a");
       const b = ensure(m, "b");

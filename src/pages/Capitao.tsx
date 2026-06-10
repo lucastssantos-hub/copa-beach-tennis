@@ -8,7 +8,7 @@ import FormInput from "../components/FormInput";
 import StatusPill from "../components/StatusPill";
 import { useTable } from "../lib/useTable";
 import { supabase, supabaseConfigured } from "../lib/supabase";
-import { advanceMatchStatus, createAuditLog, createNotification, upsertPresence } from "../lib/actions";
+import { advanceMatchStatus, contestResult, createAuditLog, createNotification, upsertPresence } from "../lib/actions";
 import { teamSide } from "../lib/engine";
 import type { Match, Presence, Team } from "../lib/types";
 
@@ -252,6 +252,71 @@ function LineupForm({ team, match, onDone }: LineupFormProps) {
   );
 }
 
+// Confronto encerrado: capitão vê o resultado e pode contestar com motivo (Fase 3).
+function FinishedMatchBlock({ team, match, onDone }: { team: Team; match: Match; onDone: () => void }) {
+  const [contesting, setContesting] = useState(false);
+  const [reason, setReason] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const contested = match.match_status === "Resultado contestado";
+  const walkover = match.match_status === "W.O." || match.match_status === "Desistência";
+
+  async function sendContest() {
+    if (!reason.trim()) return;
+    setSending(true);
+    await contestResult(match, reason, team.team_name);
+    setSending(false);
+    setContesting(false);
+    setReason("");
+    onDone();
+  }
+
+  return (
+    <div className="animate-fade-in-up space-y-3 rounded-3xl border border-coral/40 bg-white/[0.05] p-4">
+      <p className="text-sm font-extrabold uppercase tracking-wide text-coral">
+        Resultado — {match.team_a_name} x {match.team_b_name}
+      </p>
+      <p className="font-display text-2xl text-branco-quente">
+        {match.score_team_a} × {match.score_team_b}
+        {walkover && (
+          <span className="ml-2 align-middle text-sm font-extrabold uppercase text-rose-300">{match.match_status}</span>
+        )}
+      </p>
+
+      {contested ? (
+        <p className="rounded-2xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm font-bold text-rose-300">
+          ⚠ Contestação enviada — aguardando decisão da organização.
+          {match.contest_reason && (
+            <span className="block font-semibold text-rose-200">Motivo: {match.contest_reason}</span>
+          )}
+        </p>
+      ) : walkover ? null : !contesting ? (
+        <Button variant="secondary" full onClick={() => setContesting(true)}>
+          ⚠ Contestar resultado
+        </Button>
+      ) : (
+        <div className="space-y-2">
+          <FormInput
+            label="Motivo da contestação (obrigatório)"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="Descreva o que aconteceu"
+            autoComplete="off"
+          />
+          <div className="flex gap-2">
+            <Button variant="ghost" className="flex-1" onClick={() => setContesting(false)}>
+              Cancelar
+            </Button>
+            <Button className="flex-1" disabled={sending || !reason.trim()} onClick={sendContest}>
+              {sending ? "Enviando…" : "Enviar contestação"}
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CaptainPanel({ team, onLogout }: { team: Team; onLogout: () => void }) {
   const { data: matches, refresh } = useTable<Match>("matches", { pollMs: 15000 });
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -317,7 +382,11 @@ function CaptainPanel({ team, onLogout }: { team: Team; onLogout: () => void }) 
       </section>
 
       {selected ? (
-        <LineupForm key={selected.id} team={team} match={selected} onDone={refresh} />
+        ["Finalizado", "Resultado contestado", "W.O.", "Desistência"].includes(selected.match_status) ? (
+          <FinishedMatchBlock key={selected.id} team={team} match={selected} onDone={refresh} />
+        ) : (
+          <LineupForm key={selected.id} team={team} match={selected} onDone={refresh} />
+        )
       ) : (
         teamMatches.length > 0 && (
           <p className="text-center text-xs font-bold uppercase tracking-wide text-cream/50">

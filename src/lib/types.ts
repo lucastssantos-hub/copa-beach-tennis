@@ -31,7 +31,10 @@ export type MatchStatus =
   | "Liberado para quadra"
   | "Em andamento"
   | "Resultado pendente"
-  | "Finalizado";
+  | "Finalizado"
+  | "Resultado contestado"
+  | "W.O."
+  | "Desistência";
 
 export const MATCH_STATUSES: MatchStatus[] = [
   "Aguardando escalação",
@@ -43,6 +46,9 @@ export const MATCH_STATUSES: MatchStatus[] = [
   "Em andamento",
   "Resultado pendente",
   "Finalizado",
+  "Resultado contestado",
+  "W.O.",
+  "Desistência",
 ];
 
 export interface Match {
@@ -66,6 +72,7 @@ export interface Match {
   score_team_b: number;
   match_mode: string;
   mixed_required: boolean;
+  contest_reason: string | null;
   created_at: string;
   updated_at: string;
 }
