@@ -29,6 +29,13 @@ import {
 import type { Lineup, Match, Presence, Result, Team } from "../lib/types";
 
 const SESSION_KEY = "copa-capitao-team";
+const WARMUP_KEY = "copa-capitao-warmup";
+const WARMUP_MS = 5 * 60 * 1000;
+
+interface Warmup {
+  matchId: string;
+  deadline: number;
+}
 
 function loadSession(): Team | null {
   try {
@@ -37,6 +44,23 @@ function loadSession(): Team | null {
   } catch {
     return null;
   }
+}
+
+// Aquecimento sobrevive a reload; descarta se já passou mais de 1 min do fim.
+function loadWarmup(): Warmup | null {
+  try {
+    const raw = localStorage.getItem(WARMUP_KEY);
+    if (!raw) return null;
+    const w = JSON.parse(raw) as Warmup;
+    return typeof w?.deadline === "number" && w.deadline > Date.now() - 60_000 ? w : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatCountdown(ms: number) {
+  const s = Math.max(0, Math.ceil(ms / 1000));
+  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 }
 
 interface LoginProps {
@@ -206,6 +230,7 @@ function CaptainMatchView({
   results,
   onBack,
   onChanged,
+  onSent,
 }: {
   team: Team;
   match: Match;
@@ -214,6 +239,7 @@ function CaptainMatchView({
   results: Result[];
   onBack: () => void;
   onChanged: () => void;
+  onSent: () => void;
 }) {
   const side = teamSide(match, team);
   const myLineup = side ? sideLineup(match, lineups, side) : null;
@@ -271,8 +297,13 @@ function CaptainMatchView({
       setError(err);
       return;
     }
-    setFeedback(status === "Enviada" ? "Escalação enviada com sucesso!" : "Rascunho salvo.");
     onChanged();
+    if (status === "Enviada") {
+      // Volta para a lista de confrontos e abre o popup de quadra + aquecimento.
+      onSent();
+      return;
+    }
+    setFeedback("Rascunho salvo.");
   }
 
   async function imReady() {
@@ -335,7 +366,7 @@ function CaptainMatchView({
     <div className="animate-fade-in-up space-y-4 px-5 pt-2">
       <div className="flex items-center justify-between">
         <button onClick={onBack} className="text-xs font-bold uppercase tracking-wide text-cream/50">
-          ← Voltar aos confrontos
+          ✕ Fechar
         </button>
         <StatusPill status={match.match_status} />
       </div>
@@ -484,6 +515,29 @@ function CaptainPanel({ team, onLogout }: { team: Team; onLogout: () => void }) 
   const { data: presence, refresh: refreshPresence } = useTable<Presence>("presence", { pollMs: 15000 });
   const { data: results, refresh: refreshResults } = useTable<Result>("results", { pollMs: 15000 });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [warmup, setWarmup] = useState<Warmup | null>(loadWarmup);
+  const [warmupOpen, setWarmupOpen] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    if (!warmup) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [warmup]);
+
+  function startWarmup(matchId: string) {
+    const w: Warmup = { matchId, deadline: Date.now() + WARMUP_MS };
+    localStorage.setItem(WARMUP_KEY, JSON.stringify(w));
+    setWarmup(w);
+    setWarmupOpen(true);
+    setSelectedId(null);
+  }
+
+  function clearWarmup() {
+    localStorage.removeItem(WARMUP_KEY);
+    setWarmup(null);
+    setWarmupOpen(false);
+  }
 
   function refresh() {
     refreshMatches();
@@ -508,25 +562,97 @@ function CaptainPanel({ team, onLogout }: { team: Team; onLogout: () => void }) 
   const historico = teamMatches.filter((m) => isTerminal(m.match_status));
   const selected = teamMatches.find((m) => m.id === selectedId) ?? null;
   const categories = [...new Set(teamMatches.map((m) => m.category_name).filter(Boolean))] as string[];
-
-  // Tela dedicada do confronto (fluxo Lovable)
-  if (selected) {
-    return (
-      <CaptainMatchView
-        key={selected.id}
-        team={team}
-        match={selected}
-        lineups={lineups}
-        presence={presence}
-        results={results}
-        onBack={() => setSelectedId(null)}
-        onChanged={refresh}
-      />
-    );
-  }
+  // O confronto vem da lista viva (polling) — a quadra aparece assim que o ADM liberar.
+  const warmupMatch = warmup ? teamMatches.find((m) => m.id === warmup.matchId) ?? null : null;
+  const warmupRemaining = warmup ? warmup.deadline - now : 0;
+  const warmupEnded = warmup !== null && warmupRemaining <= 0;
 
   return (
     <div className="space-y-4 px-5 pt-2">
+      {/* Popup do confronto sobre a lista — o capitão não perde a posição de rolagem */}
+      {selected && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm"
+          onClick={() => setSelectedId(null)}
+        >
+          <div
+            className="max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-3xl border border-white/15 bg-roxo-escuro pb-8 pt-3 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-white/20" />
+            <CaptainMatchView
+              key={selected.id}
+              team={team}
+              match={selected}
+              lineups={lineups}
+              presence={presence}
+              results={results}
+              onBack={() => setSelectedId(null)}
+              onChanged={refresh}
+              onSent={() => startWarmup(selected.id)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Popup pós-envio: quadra do jogo + timer de aquecimento de 5 min */}
+      {warmup && warmupOpen && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 px-6 backdrop-blur-sm"
+          onClick={() => setWarmupOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm space-y-4 rounded-3xl border border-white/15 bg-roxo-escuro p-6 text-center shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm font-extrabold text-emerald-300">✓ Escalação enviada com sucesso!</p>
+            <div>
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-cream/50">
+                Quadra do jogo
+              </p>
+              {warmupMatch?.court ? (
+                <p className="font-display text-3xl text-branco-quente">{warmupMatch.court}</p>
+              ) : (
+                <p className="mt-1 text-sm font-bold text-amber-300">
+                  A definir pela organização — acompanhe aqui.
+                </p>
+              )}
+            </div>
+            <div>
+              <p className="text-[11px] font-extrabold uppercase tracking-widest text-cream/50">
+                Aquecimento
+              </p>
+              <p
+                className={`font-display text-6xl tabular-nums ${warmupEnded ? "text-coral" : "text-branco-quente"}`}
+              >
+                {formatCountdown(warmupRemaining)}
+              </p>
+              {warmupEnded && (
+                <p className="text-sm font-bold text-coral">Aquecimento encerrado — dirija-se à quadra!</p>
+              )}
+            </div>
+            <Button full variant="ghost" onClick={() => (warmupEnded ? clearWarmup() : setWarmupOpen(false))}>
+              {warmupEnded ? "OK" : "Minimizar"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Timer minimizado: continua visível na tela do capitão */}
+      {warmup && !warmupOpen && (
+        <button
+          onClick={() => setWarmupOpen(true)}
+          className="flex w-full items-center justify-between rounded-2xl border border-coral/40 bg-coral/10 px-4 py-3"
+        >
+          <span className="text-xs font-extrabold uppercase tracking-wider text-coral">
+            ⏱ Aquecimento {warmupMatch?.court ? `· ${warmupMatch.court}` : "· quadra a definir"}
+          </span>
+          <span className="font-display text-xl tabular-nums text-branco-quente">
+            {formatCountdown(warmupRemaining)}
+          </span>
+        </button>
+      )}
+
       <div className="flex items-center gap-3 rounded-3xl border border-white/10 bg-white/[0.05] p-4">
         <span className="text-3xl">{team.flag || "🏳️"}</span>
         <div className="min-w-0 flex-1">
