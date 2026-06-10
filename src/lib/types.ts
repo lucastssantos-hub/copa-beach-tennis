@@ -6,7 +6,6 @@ export interface Team {
   flag: string | null;
   captain_name: string | null;
   captain_phone: string | null;
-  access_code: string | null;
   status: string;
   created_at: string;
   updated_at: string;

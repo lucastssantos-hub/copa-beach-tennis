@@ -46,12 +46,10 @@ function CaptainLogin({ onLogin }: LoginProps) {
     }
     setLoading(true);
     setError(null);
-    const { data, error: err } = await supabase
-      .from("teams")
-      .select("*")
-      .or(`team_name.ilike.%${query}%,country.ilike.%${query}%`)
-      .eq("access_code", code)
-      .limit(1);
+    const { data, error: err } = await supabase.rpc("verify_captain_login", {
+      p_query: query,
+      p_code: code,
+    });
     setLoading(false);
     if (err) {
       setError(err.message);
