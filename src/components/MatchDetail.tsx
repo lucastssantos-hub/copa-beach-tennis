@@ -21,7 +21,8 @@ import {
   isCourtFree,
   needsMista,
   resultsFor,
-  sideTeamId,
+  sideLineup,
+  sidePresence,
   sideTeamName,
   winnerSide,
   type GameType,
@@ -40,26 +41,6 @@ interface MatchDetailProps {
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
     <p className="text-[11px] font-extrabold uppercase tracking-widest text-cream/60">{children}</p>
-  );
-}
-
-function sidePresence(match: Match, presence: Presence[], side: "a" | "b"): Presence | null {
-  const teamId = sideTeamId(match, side);
-  const teamName = sideTeamName(match, side);
-  return (
-    presence.find(
-      (p) => p.match_id === match.id && (teamId ? p.team_id === teamId : p.team_name === teamName),
-    ) ?? null
-  );
-}
-
-function sideLineup(match: Match, lineups: Lineup[], side: "a" | "b"): Lineup | null {
-  const teamId = sideTeamId(match, side);
-  const teamName = sideTeamName(match, side);
-  return (
-    lineups.find(
-      (l) => l.match_id === match.id && (teamId ? l.team_id === teamId : l.team_name === teamName),
-    ) ?? null
   );
 }
 

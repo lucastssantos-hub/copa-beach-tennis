@@ -3,7 +3,7 @@
 // Porta as regras do motor legado (src/engine.js) para o schema normalizado:
 // mista condicional, classificação com desempates oficiais e geração de chaves.
 // ============================================================================
-import type { Court, Match, MatchStatus, Result, Team } from "./types";
+import type { Court, Lineup, Match, MatchStatus, Presence, Result, Team } from "./types";
 
 export type GameType = "Feminino" | "Masculino" | "Mista";
 export const GAME_TYPES: GameType[] = ["Feminino", "Masculino", "Mista"];
@@ -223,6 +223,89 @@ export function roundRobin<T>(teams: T[]): [T, T][][] {
     rot.unshift(rot.pop()!);
   }
   return rounds;
+}
+
+// ---------------------------------------------------------------------------
+// Prontidão (formato Lovable): buckets por status + estado da mista
+// ---------------------------------------------------------------------------
+export type ReadinessBucket =
+  | "pendentes"
+  | "escalacoes"
+  | "prontos"
+  | "em_quadra"
+  | "resultado"
+  | "finalizados";
+
+export const READINESS_BUCKETS: Array<{ key: ReadinessBucket; label: string }> = [
+  { key: "pendentes", label: "Pendentes" },
+  { key: "escalacoes", label: "Escalações" },
+  { key: "prontos", label: "Prontos" },
+  { key: "em_quadra", label: "Em quadra" },
+  { key: "resultado", label: "Resultado" },
+  { key: "finalizados", label: "Final." },
+];
+
+export function readinessBucket(status: MatchStatus): ReadinessBucket {
+  switch (status) {
+    case "Aguardando escalação":
+    case "Escalação parcial":
+      return "pendentes";
+    case "Escalações recebidas":
+    case "Aguardando presença":
+      return "escalacoes";
+    case "Pronto para quadra":
+      return "prontos";
+    case "Liberado para quadra":
+    case "Em andamento":
+      return "em_quadra";
+    case "Resultado pendente":
+    case "Resultado contestado":
+      return "resultado";
+    case "Finalizado":
+    case "W.O.":
+    case "Desistência":
+      return "finalizados";
+  }
+}
+
+export type MixedState = "nao_necessaria" | "se_necessario" | "necessaria" | "jogada";
+
+export const MIXED_LABEL: Record<MixedState, string> = {
+  nao_necessaria: "Mista: não necessária",
+  se_necessario: "Mista: se necessário",
+  necessaria: "Mista: necessária",
+  jogada: "Mista: jogada",
+};
+
+export function mixedState(match: Match, results: Result[]): MixedState {
+  const g = resultsFor(match, results);
+  if (winnerSide(match, g.mista)) return "jogada";
+  const wf = winnerSide(match, g.fem);
+  const wm = winnerSide(match, g.masc);
+  if (!wf || !wm) return "se_necessario";
+  return wf === wm ? "nao_necessaria" : "necessaria";
+}
+
+/** Linha de presença de um lado do confronto (ou null). */
+export function sidePresence(match: Match, presence: Presence[], side: "a" | "b"): Presence | null {
+  const teamId = sideTeamId(match, side);
+  const teamName = sideTeamName(match, side);
+  return (
+    presence.find(
+      (p) => p.match_id === match.id && (teamId ? p.team_id === teamId : p.team_name === teamName),
+    ) ?? null
+  );
+}
+
+/** Escalação de um lado do confronto (ou null). */
+export function sideLineup(match: Match, lineups: Lineup[], side: "a" | "b"): Lineup | null {
+  const teamId = sideTeamId(match, side);
+  const teamName = sideTeamName(match, side);
+  return (
+    lineups.find(
+      (l) => l.match_id === match.id && (teamId ? l.team_id === teamId : l.team_name === teamName),
+    ) ?? null
+  );
 }
 
 // ---------------------------------------------------------------------------

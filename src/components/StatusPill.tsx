@@ -1,13 +1,13 @@
 const STATUS_COLORS: Record<string, string> = {
-  // matches
-  "Aguardando escalação": "bg-white/10 text-cream/80 border-white/15",
+  // matches — tons do formato Lovable: vermelho/amarelo/azul/verde/roxo/laranja/cinza
+  "Aguardando escalação": "bg-coral/15 text-coral border-coral/30",
   "Escalação parcial": "bg-amber-400/15 text-amber-300 border-amber-400/30",
   "Escalações recebidas": "bg-sky-400/15 text-sky-300 border-sky-400/30",
   "Aguardando presença": "bg-amber-400/15 text-amber-300 border-amber-400/30",
   "Pronto para quadra": "bg-emerald-400/15 text-emerald-300 border-emerald-400/30",
   "Liberado para quadra": "bg-emerald-400/20 text-emerald-300 border-emerald-400/40",
-  "Em andamento": "bg-coral/20 text-coral border-coral/40",
-  "Resultado pendente": "bg-violet-400/15 text-violet-300 border-violet-400/30",
+  "Em andamento": "bg-violet-400/20 text-violet-300 border-violet-400/40",
+  "Resultado pendente": "bg-orange-400/15 text-orange-300 border-orange-400/30",
   Finalizado: "bg-white/8 text-cream/60 border-white/10",
   "Resultado contestado": "bg-rose-400/15 text-rose-300 border-rose-400/30",
   "W.O.": "bg-rose-400/15 text-rose-300 border-rose-400/30",

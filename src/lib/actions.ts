@@ -74,6 +74,35 @@ export async function upsertPresence(
   }
 }
 
+/** ADM confirma a presença de um lado; avança o status quando os dois confirmam. */
+export async function confirmPresenceAndAdvance(
+  match: Match,
+  side: "a" | "b",
+  otherConfirmed: boolean,
+) {
+  await upsertPresence(match, side, { admin_confirmed: true });
+  await advanceMatchStatus(match, otherConfirmed ? "Pronto para quadra" : "Aguardando presença");
+}
+
+/** ADM cobra a escalação de um capitão (notificação tipo 'cobranca'). */
+export async function pokeCaptain(match: Match, side: "a" | "b", actor = "ORG") {
+  if (!supabase) return;
+  const teamName = sideTeamName(match, side);
+  await createNotification({
+    notification_type: "cobranca",
+    message: `📣 Organização cobrou a escalação de ${teamName} (${matchLabel(match)})`,
+    team_id: sideTeamId(match, side),
+    team_name: teamName,
+    match_id: match.id,
+  });
+  await createAuditLog({
+    actor,
+    action: "COBRAR_CAPITAO",
+    entity: "notifications",
+    details: `${teamName} — ${matchLabel(match)}`,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Liberação de quadra (1 quadra no modo sequencial, 2 no simultâneo)
 // ---------------------------------------------------------------------------

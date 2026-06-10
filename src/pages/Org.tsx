@@ -3,9 +3,9 @@ import AppShell from "../components/AppShell";
 import Header from "../components/Header";
 import CategoryChips from "../components/CategoryChips";
 import BottomNav from "../components/BottomNav";
-import MatchCard from "../components/MatchCard";
 import MatchDetail from "../components/MatchDetail";
-import CourtCard from "../components/CourtCard";
+import MatchReadinessCard from "../components/MatchReadinessCard";
+import CourtGridCompact from "../components/CourtGridCompact";
 import EmptyState from "../components/EmptyState";
 import Button from "../components/Button";
 import FormInput, { FormSelect } from "../components/FormInput";
@@ -14,6 +14,7 @@ import StandingsTable from "../components/StandingsTable";
 import { useTable } from "../lib/useTable";
 import { supabase, supabaseConfigured } from "../lib/supabase";
 import { createAuditLog } from "../lib/actions";
+import { READINESS_BUCKETS, readinessBucket, type ReadinessBucket } from "../lib/engine";
 import {
   CATEGORY_CHIPS,
   type AuditLog,
@@ -189,6 +190,7 @@ export default function Org() {
   const [category, setCategory] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [bucket, setBucket] = useState<ReadinessBucket>("pendentes");
 
   const { data: matches, refresh: refreshMatches } = useTable<Match>("matches", { pollMs: 10000 });
   const { data: courts, refresh: refreshCourts } = useTable<Court>("courts", {
@@ -211,6 +213,13 @@ export default function Org() {
     () => (category ? matches.filter((m) => m.category_name === category) : matches),
     [matches, category],
   );
+
+  // Prontidão (formato Lovable): confrontos agrupados por estágio do fluxo.
+  const bucketed = useMemo(() => {
+    const groups = Object.fromEntries(READINESS_BUCKETS.map((b) => [b.key, [] as Match[]]));
+    for (const m of filteredMatches) groups[readinessBucket(m.match_status)].push(m);
+    return groups as Record<ReadinessBucket, Match[]>;
+  }, [filteredMatches]);
 
   function refreshOps() {
     refreshMatches();
@@ -243,11 +252,24 @@ export default function Org() {
         )}
 
         {tab === "ops" && (
-          <section className="space-y-3">
+          <section className="space-y-4">
+            <div>
+              <h2 className="mb-3 text-lg font-extrabold text-branco-quente">Quadras ao Vivo</h2>
+              {courts.length === 0 ? (
+                <EmptyState
+                  icon="🎾"
+                  title="Nenhuma quadra cadastrada"
+                  message="Rode o schema.sql no Supabase para criar as 13 quadras."
+                />
+              ) : (
+                <CourtGridCompact courts={courts} />
+              )}
+            </div>
+
             <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-extrabold text-branco-quente">Todos os Confrontos</h2>
+              <h2 className="text-lg font-extrabold text-branco-quente">Prontidão dos Confrontos</h2>
               <Button variant="secondary" onClick={() => setShowForm((v) => !v)} className="!px-4 !py-2 text-xs">
-                {showForm ? "Fechar" : "+ Novo confronto"}
+                {showForm ? "Fechar" : "+ Novo"}
               </Button>
             </div>
 
@@ -260,19 +282,41 @@ export default function Org() {
               />
             )}
 
-            {filteredMatches.length === 0 ? (
+            <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+              {READINESS_BUCKETS.map((b) => (
+                <button
+                  key={b.key}
+                  type="button"
+                  onClick={() => setBucket(b.key)}
+                  className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-[11px] font-extrabold uppercase tracking-wider transition ${
+                    bucket === b.key
+                      ? "border-coral/60 bg-coral/20 text-coral"
+                      : "border-white/15 text-cream/50"
+                  }`}
+                >
+                  {b.label} ({bucketed[b.key].length})
+                </button>
+              ))}
+            </div>
+
+            {bucketed[bucket].length === 0 ? (
               <EmptyState
                 icon="🆚"
-                title="Nenhum confronto cadastrado"
-                message={category ? `Sem confrontos na categoria ${category}.` : "Use o botão Novo confronto para criar o primeiro."}
+                title="Nenhum confronto nesta lista"
+                message={category ? `Sem confrontos da categoria ${category} neste estágio.` : "Os confrontos aparecem aqui conforme avançam no fluxo."}
               />
             ) : (
-              filteredMatches.map((m) => (
+              bucketed[bucket].map((m) => (
                 <div key={m.id} className="space-y-3">
-                  <MatchCard
+                  <MatchReadinessCard
                     match={m}
+                    lineups={lineups}
+                    presence={presence}
+                    results={results}
                     selected={m.id === selectedId}
-                    onClick={() => setSelectedId(m.id === selectedId ? null : m.id)}
+                    onOpen={() => setSelectedId(m.id === selectedId ? null : m.id)}
+                    onEnsureOpen={() => setSelectedId(m.id)}
+                    onChanged={refreshOps}
                   />
                   {m.id === selectedId && (
                     <MatchDetail
@@ -298,20 +342,6 @@ export default function Org() {
               matches={matches}
               onGenerated={refreshMatches}
             />
-            <h2 className="text-lg font-extrabold text-branco-quente">Quadras ao Vivo</h2>
-            {courts.length === 0 ? (
-              <EmptyState
-                icon="🎾"
-                title="Nenhuma quadra cadastrada"
-                message="Rode o schema.sql no Supabase para criar as 13 quadras."
-              />
-            ) : (
-              <div className="grid grid-cols-2 gap-3">
-                {courts.map((c) => (
-                  <CourtCard key={c.id} court={c} />
-                ))}
-              </div>
-            )}
           </section>
         )}
 
