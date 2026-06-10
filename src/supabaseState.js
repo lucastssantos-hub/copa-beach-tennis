@@ -66,3 +66,16 @@ export async function saveRemoteMatches(matches) {
     }),
   });
 }
+
+// Login do Capitão: resolve um código de acesso para o código da equipe via RPC
+// (verify_captain_code). Retorna a string da equipe (ex.: "BRA") ou null se o
+// código for inválido ou o Supabase não estiver configurado.
+export async function verifyCaptainCode(code) {
+  if (!hasSupabaseConfig) return null;
+  const result = await supabaseRequest("rpc/verify_captain_code", {
+    method: "POST",
+    body: JSON.stringify({ p_code: String(code || "").trim() }),
+  });
+  // A função retorna um escalar (text) — o PostgREST devolve o valor direto.
+  return typeof result === "string" && result ? result : null;
+}

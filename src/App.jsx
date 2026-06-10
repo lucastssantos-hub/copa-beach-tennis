@@ -2,7 +2,7 @@
 // App — Organização (ADM + Mesário + Público). App SEPARADO do Capitão.
 // (O Capitão usa capitao.html → captainApp.jsx, sem acesso a estas telas.)
 // ============================================================================
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CATEGORIES, SCHEDULE, categoryMeta } from "./data.js";
 import { useTournament } from "./useTournament.js";
 import { AppBar, Card, Toast, Bell } from "./components.jsx";
@@ -10,6 +10,10 @@ import { Classificacao } from "./standings.jsx";
 import { RefereeQueue, RefereeMatch } from "./refereeFlow.jsx";
 import { CentroOperacoes, AdminDashboard, AdminMatch, NotificationsScreen, AuditScreen } from "./adminOps.jsx";
 import { PublicTV } from "./publicTV.jsx";
+
+// PIN de acesso ao perfil Organização (ADM).
+// Defina VITE_ADM_PIN no .env para sobrescrever o padrão.
+const ADM_PIN = import.meta.env.VITE_ADM_PIN || "copa2026";
 
 const ROLES = [
   ["admin", "Organização", "#9B6BFF"],
@@ -21,11 +25,12 @@ const DEFAULT_TAB = { admin: "ops", arbitro: "quadras", publico: "tv" };
 
 export default function App() {
   const { matches, notifications, audits, dispatch, reset, setNotifications, courtCount, setCourtCount } = useTournament({ manageWarmup: true });
-  const [role, setRole] = useState("admin");
-  const [tab, setTab] = useState(DEFAULT_TAB.admin);
+  const [role, setRole] = useState("arbitro"); // começa como Mesário — ADM requer PIN
+  const [tab, setTab] = useState(DEFAULT_TAB.arbitro);
   const [openId, setOpenId] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState("60+");
   const [toastMsg, setToastMsg] = useState("");
+  const [pinOpen, setPinOpen] = useState(false);
   const toast = m => setToastMsg(m);
 
   // Notificações por perfil
@@ -44,7 +49,20 @@ export default function App() {
     setOpenId(null); setSelectedCategory("60+"); setTab(DEFAULT_TAB[role]);
     toast("Dados restaurados");
   }
-  function switchRole(r) { setRole(r); setOpenId(null); setTab(DEFAULT_TAB[r]); }
+
+  function switchRole(r) {
+    if (r === "admin" && role !== "admin") {
+      setPinOpen(true);
+      return;
+    }
+    setRole(r); setOpenId(null); setTab(DEFAULT_TAB[r]);
+  }
+
+  function handlePinSuccess() {
+    setPinOpen(false);
+    setRole("admin"); setOpenId(null); setTab(DEFAULT_TAB.admin);
+  }
+
   function switchCategory(c) { setSelectedCategory(c); setOpenId(null); }
 
   const openMatch = matches.find(m => m.id === openId);
@@ -95,9 +113,11 @@ export default function App() {
         <div style={{ display: "flex", gap: 8, padding: "12px 16px 0", flexShrink: 0, alignItems: "center" }}>
           <RoleSwitcher role={role} onSwitch={switchRole} />
           {role === "admin" && <Bell count={unread} onClick={() => { setOpenId(null); setTab("notif"); }} />}
-          <button onClick={resetApp} title="Reiniciar demo" aria-label="Reiniciar demo" style={{ width: 40, height: 40,
-            borderRadius: 12, background: "rgba(242,228,201,.08)", border: "1px solid rgba(242,228,201,.14)",
-            color: "#C9BBA0", fontSize: 17, cursor: "pointer", flexShrink: 0 }}>↺</button>
+          {role === "admin" && (
+            <button onClick={resetApp} title="Reiniciar demo" aria-label="Reiniciar demo" style={{ width: 40, height: 40,
+              borderRadius: 12, background: "rgba(242,228,201,.08)", border: "1px solid rgba(242,228,201,.14)",
+              color: "#C9BBA0", fontSize: 17, cursor: "pointer", flexShrink: 0 }}>↺</button>
+          )}
         </div>
 
         {!openMatch && (
@@ -131,6 +151,7 @@ export default function App() {
         )}
 
         <Toast msg={toastMsg} onClose={() => setToastMsg("")} />
+        {pinOpen && <PinModal onSuccess={handlePinSuccess} onClose={() => setPinOpen(false)} />}
       </div>
     </div>
   );
@@ -199,6 +220,99 @@ function ScheduleStrip({ selected }) {
           <div style={{ fontFamily: "'Archivo Black',sans-serif", color: "#FF5A4E", fontSize: 18 }}>{row.time}</div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ---------- PIN Modal (auth para perfil Organização) ----------
+function PinModal({ onSuccess, onClose }) {
+  const [value, setValue] = useState("");
+  const [error, setError] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    // foca o input ao abrir
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }, []);
+
+  function handleSubmit(e) {
+    e.preventDefault();
+    if (value === ADM_PIN) {
+      onSuccess();
+    } else {
+      setError(true);
+      setValue("");
+      setTimeout(() => setError(false), 1200);
+    }
+  }
+
+  return (
+    <div onClick={onClose} style={{
+      position: "absolute", inset: 0, zIndex: 200,
+      background: "rgba(14,5,24,.85)", backdropFilter: "blur(6px)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      <form onClick={e => e.stopPropagation()} onSubmit={handleSubmit} style={{
+        background: "linear-gradient(160deg, #2a1257 0%, #1B0B44 100%)",
+        border: `1px solid ${error ? "rgba(255,77,77,.5)" : "rgba(155,107,255,.3)"}`,
+        borderRadius: 20, padding: "32px 28px", width: 280,
+        boxShadow: "0 24px 80px -16px rgba(0,0,0,.9)",
+        display: "flex", flexDirection: "column", gap: 16,
+        transition: "border-color .3s",
+      }}>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ fontSize: 32, marginBottom: 4 }}>🔐</div>
+          <div style={{ fontFamily: "'Archivo Black', sans-serif", fontSize: 17, color: "#FBF7EE" }}>
+            Organização
+          </div>
+          <div style={{ fontSize: 12.5, color: "#8a7d9f", marginTop: 4 }}>
+            Digite o PIN de acesso
+          </div>
+        </div>
+
+        <input
+          ref={inputRef}
+          type="password"
+          inputMode="numeric"
+          pattern="[0-9a-zA-Z]*"
+          maxLength={20}
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          placeholder="PIN"
+          style={{
+            background: error ? "rgba(255,77,77,.12)" : "rgba(14,5,24,.6)",
+            border: `1.5px solid ${error ? "rgba(255,77,77,.6)" : "rgba(155,107,255,.25)"}`,
+            borderRadius: 12, padding: "12px 14px",
+            color: "#FBF7EE", fontSize: 16, letterSpacing: "0.3em",
+            textAlign: "center", outline: "none", width: "100%",
+            fontFamily: "'JetBrains Mono', monospace",
+            transition: "border-color .2s, background .2s",
+          }}
+        />
+
+        {error && (
+          <div style={{ textAlign: "center", fontSize: 12.5, color: "#FF4D4D", marginTop: -8 }}>
+            PIN incorreto
+          </div>
+        )}
+
+        <button type="submit" disabled={!value} style={{
+          padding: "13px 0", borderRadius: 13, border: "none", cursor: value ? "pointer" : "not-allowed",
+          background: value ? "linear-gradient(135deg, #9B6BFF, #7B44FF)" : "rgba(155,107,255,.2)",
+          color: value ? "#FBF7EE" : "#5a4f78",
+          fontFamily: "'Archivo', sans-serif", fontWeight: 800, fontSize: 14,
+          transition: "all .18s ease",
+        }}>
+          Entrar
+        </button>
+
+        <button type="button" onClick={onClose} style={{
+          background: "transparent", border: "none", cursor: "pointer",
+          color: "#5a4f78", fontSize: 12.5, textAlign: "center",
+        }}>
+          Cancelar
+        </button>
+      </form>
     </div>
   );
 }

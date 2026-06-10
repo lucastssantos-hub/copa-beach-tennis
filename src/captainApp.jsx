@@ -1,13 +1,14 @@
 // ============================================================================
 // captainApp — App independente do Capitão (dispositivo do capitão).
 // Sem seletor de perfil: o capitão NÃO acessa a Organização/Mesário.
-// Abre com a seleção de equipe; depois só vê suas funções.
+// Abre com login por código de acesso; depois só vê suas funções.
 // Compartilha o mesmo estado de torneio (useTournament) — uma escalação enviada
 // aqui aparece na Organização (sync por localStorage; backend = Fase 2).
 // ============================================================================
 import { useState } from "react";
 import { TEAMS, CATEGORIES, categoryMeta } from "./data.js";
 import { useTournament } from "./useTournament.js";
+import { verifyCaptainCode } from "./supabaseState.js";
 import { Toast, Flag, Eyebrow } from "./components.jsx";
 import { CaptainHome } from "./captainHome.jsx";
 import { CaptainMatch } from "./captainMatch.jsx";
@@ -16,9 +17,22 @@ import { CaptainHistory } from "./standings.jsx";
 const ACCENT = "#FF5A4E";
 const TEAM_KEY = "copa-captain-team";
 
+// Lê ?equipe=ITA (ou ?e=ITA) da URL; tem precedência sobre localStorage.
+// Se encontrado na URL, persiste no localStorage para não perder ao recarregar.
+function getInitialTeam() {
+  const params = new URLSearchParams(window.location.search);
+  const fromUrl = (params.get("equipe") || params.get("e") || "").toUpperCase();
+  if (fromUrl && TEAMS[fromUrl]) {
+    localStorage.setItem(TEAM_KEY, fromUrl);
+    return fromUrl;
+  }
+  return localStorage.getItem(TEAM_KEY) || null;
+}
+
 export default function CaptainApp() {
   const { matches, dispatch } = useTournament({ manageWarmup: false });
-  const [teamCode, setTeamCode] = useState(() => localStorage.getItem(TEAM_KEY) || null);
+  // Se URL tem ?equipe=ITA, a equipe já vem pré-selecionada
+  const [teamCode, setTeamCode] = useState(() => getInitialTeam());
   const [tab, setTab] = useState("home");
   const [openId, setOpenId] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -54,7 +68,7 @@ export default function CaptainApp() {
         overflow: "hidden", boxShadow: "0 40px 120px -30px rgba(0,0,0,.8)", display: "flex", flexDirection: "column" }}>
 
         {!teamCode ? (
-          <TeamSelect onChoose={chooseTeam} />
+          <CaptainLogin onAuth={chooseTeam} />
         ) : (
           <>
             {/* Identidade do capitão (sem troca de perfil) */}
@@ -117,31 +131,69 @@ export default function CaptainApp() {
   );
 }
 
-// ---------- Seleção de equipe ----------
-function TeamSelect({ onChoose }) {
-  const teams = Object.values(TEAMS).sort((a, b) => a.name.localeCompare(b.name));
+// ---------- Login do Capitão (código de acesso) ----------
+function CaptainLogin({ onAuth }) {
+  const [code, setCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const canSubmit = code.trim().length >= 4 && !loading;
+
+  async function submit(e) {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setLoading(true);
+    setError("");
+    try {
+      const teamCode = await verifyCaptainCode(code);
+      if (teamCode && TEAMS[teamCode]) {
+        onAuth(teamCode);
+      } else {
+        setError("Código inválido. Confira com a organização.");
+        setCode("");
+      }
+    } catch {
+      setError("Não foi possível verificar agora. Tente de novo.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <div style={{ flex: 1, overflowY: "auto", padding: "28px 20px 30px" }}>
+    <form onSubmit={submit} style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", padding: "28px 24px 40px" }}>
       <Eyebrow color={ACCENT}>App do Capitão</Eyebrow>
-      <div style={{ fontFamily: "'Archivo Black',sans-serif", fontSize: 26, color: "#FBF7EE", lineHeight: 1.05, margin: "8px 0 6px" }}>
-        Qual é a sua equipe?
+      <div style={{ fontFamily: "'Archivo Black',sans-serif", fontSize: 28, color: "#FBF7EE", lineHeight: 1.05, margin: "10px 0 8px" }}>
+        Código da equipe
       </div>
-      <div style={{ fontSize: 13, color: "#8a7d63", marginBottom: 22, lineHeight: 1.45 }}>
-        Selecione a equipe que você capitaneia. Você só verá os seus confrontos, escalações, resultados e classificação.
+      <div style={{ fontSize: 13, color: "#8a7d63", marginBottom: 26, lineHeight: 1.45 }}>
+        Digite o código que a organização entregou ao capitão. Você só verá os confrontos, escalações e classificação da sua equipe.
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-        {teams.map(t => (
-          <button key={t.id} onClick={() => onChoose(t.id)} style={{ display: "flex", alignItems: "center", gap: 10,
-            padding: "14px 14px", borderRadius: 14, cursor: "pointer", textAlign: "left",
-            background: "rgba(242,228,201,.05)", border: "1.5px solid rgba(242,228,201,.1)" }}>
-            <span style={{ fontSize: 24, lineHeight: 1, flexShrink: 0 }}>{t.flag}</span>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 13.5, fontWeight: 800, color: "#FBF7EE", lineHeight: 1.2 }}>{t.name}</div>
-              {t.captain && <div style={{ fontSize: 11, color: "#8a7d63", marginTop: 2 }}>{t.captain}</div>}
-            </div>
-          </button>
-        ))}
+
+      <input
+        value={code}
+        onChange={e => { setCode(e.target.value.replace(/\D/g, "").slice(0, 8)); setError(""); }}
+        inputMode="numeric"
+        autoComplete="off"
+        autoFocus
+        placeholder="••••"
+        aria-label="Código da equipe"
+        style={{ width: "100%", boxSizing: "border-box", textAlign: "center", letterSpacing: ".5em",
+          fontFamily: "'JetBrains Mono',monospace", fontSize: 30, fontWeight: 700, color: "#FBF7EE",
+          padding: "18px 14px", borderRadius: 16, background: "rgba(242,228,201,.06)",
+          border: `1.5px solid ${error ? ACCENT : "rgba(242,228,201,.16)"}`, outline: "none" }}
+      />
+
+      <div style={{ minHeight: 20, marginTop: 10, fontSize: 12.5, color: ACCENT, textAlign: "center", fontWeight: 600 }}>
+        {error}
       </div>
-    </div>
+
+      <button type="submit" disabled={!canSubmit} style={{ marginTop: 14, width: "100%", padding: "16px",
+        borderRadius: 14, border: "none", cursor: canSubmit ? "pointer" : "default",
+        background: canSubmit ? ACCENT : "rgba(255,90,78,.35)", color: "#160938",
+        fontFamily: "'Archivo Black',sans-serif", fontSize: 15, letterSpacing: ".02em",
+        transition: "background .15s" }}>
+        {loading ? "Verificando…" : "Entrar"}
+      </button>
+    </form>
   );
 }
