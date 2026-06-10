@@ -5,17 +5,24 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "build:capitao": "APP=capitao vite build && mv dist-capitao/capitao.html dist-capitao/index.html",
+    "build": "vite build && cp dist/index.html dist/404.html",
+    "build:capitao": "APP=capitao vite build && mv dist-capitao/legacy-capitao.html dist-capitao/index.html",
     "deploy:capitao": "bash scripts/deploy-capitao.sh",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.108.1",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.17.0"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.3.4",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^6.0.3",
     "vite": "^6.0.7"
   }
 }
