@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && cp dist/index.html dist/404.html",
     "build:capitao": "APP=capitao vite build && mv dist-capitao/legacy-capitao.html dist-capitao/index.html",
     "deploy:capitao": "bash scripts/deploy-capitao.sh",
     "preview": "vite preview"
