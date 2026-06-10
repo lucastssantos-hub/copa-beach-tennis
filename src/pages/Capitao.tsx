@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "../components/AppShell";
 import Header from "../components/Header";
-import MatchCard from "../components/MatchCard";
 import EmptyState from "../components/EmptyState";
 import Button from "../components/Button";
 import FormInput from "../components/FormInput";
@@ -111,6 +110,58 @@ function CaptainLogin({ onLogin }: LoginProps) {
         </p>
       )}
     </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Cartão compacto da lista (formato Lovable): status + placar grande no topo,
+// hora · quadra, equipes lado a lado com "vs" no meio.
+// ---------------------------------------------------------------------------
+function CaptainMatchCard({ match, onClick }: { match: Match; onClick: () => void }) {
+  return (
+    <div
+      onClick={onClick}
+      className="animate-fade-in-up cursor-pointer rounded-3xl border border-white/10 bg-white/[0.05] p-4 backdrop-blur transition active:scale-[0.99]"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <StatusPill status={match.match_status} />
+        <span className="font-display text-2xl tabular-nums leading-none text-cream/60">
+          {match.score_team_a}
+          <span className="mx-1 text-cream/30">×</span>
+          {match.score_team_b}
+        </span>
+      </div>
+      <p className="mt-1 font-mono text-xs font-bold text-cream/50">
+        {[match.scheduled_time, match.court, match.category_name && `Cat. ${match.category_name}`]
+          .filter(Boolean)
+          .join(" · ") || "—"}
+      </p>
+      <div className="mt-3 flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <span className="text-2xl leading-none">{match.team_a_flag || "🏳️"}</span>
+          <div className="min-w-0">
+            <p className="font-mono text-base font-extrabold leading-tight text-branco-quente">
+              {match.team_a_abbreviation || "—"}
+            </p>
+            <p className="truncate text-[10px] font-bold uppercase tracking-wider text-cream/50">
+              {match.team_a_name || "A definir"}
+            </p>
+          </div>
+        </div>
+        <span className="text-[10px] font-extrabold uppercase tracking-widest text-cream/40">vs</span>
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-2.5 text-right">
+          <div className="min-w-0">
+            <p className="font-mono text-base font-extrabold leading-tight text-branco-quente">
+              {match.team_b_abbreviation || "—"}
+            </p>
+            <p className="truncate text-[10px] font-bold uppercase tracking-wider text-cream/50">
+              {match.team_b_name || "A definir"}
+            </p>
+          </div>
+          <span className="text-2xl leading-none">{match.team_b_flag || "🏳️"}</span>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -508,7 +559,7 @@ function CaptainPanel({ team, onLogout }: { team: Team; onLogout: () => void }) 
             message="Aguarde a organização cadastrar os confrontos."
           />
         ) : (
-          ativos.map((m) => <MatchCard key={m.id} match={m} onClick={() => setSelectedId(m.id)} />)
+          ativos.map((m) => <CaptainMatchCard key={m.id} match={m} onClick={() => setSelectedId(m.id)} />)
         )}
       </section>
 
@@ -517,7 +568,7 @@ function CaptainPanel({ team, onLogout }: { team: Team; onLogout: () => void }) 
         {historico.length === 0 ? (
           <EmptyState icon="🏆" title="Sem partidas finalizadas" message="Os resultados aparecerão aqui." />
         ) : (
-          historico.map((m) => <MatchCard key={m.id} match={m} onClick={() => setSelectedId(m.id)} />)
+          historico.map((m) => <CaptainMatchCard key={m.id} match={m} onClick={() => setSelectedId(m.id)} />)
         )}
       </section>
     </div>
