@@ -29,6 +29,15 @@ import {
   type Team,
 } from "../lib/types";
 
+const ADMIN_SESSION_KEY = "copa-org-auth";
+const ADMIN_PIN =
+  import.meta.env.VITE_ADMIN_PIN ||
+  import.meta.env.NEXT_PUBLIC_ADMIN_PIN ||
+  "";
+const ADMIN_PIN_SHA256 =
+  import.meta.env.VITE_ADMIN_PIN_SHA256 ||
+  "9dc5c9dfa3896f79f39f558c72787ea64454aaa5923dab56ed4282a117caec2f";
+
 const TABS = [
   { id: "ops", label: "OPS" },
   { id: "conf", label: "CONF" },
@@ -48,6 +57,74 @@ interface NewMatchFormProps {
   teams: Team[];
   onCreated: () => void;
   onClose: () => void;
+}
+
+function AdminLogin({ onLogin }: { onLogin: () => void }) {
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const loginDisabled = !ADMIN_PIN && !ADMIN_PIN_SHA256;
+
+  async function sha256(value: string) {
+    const data = new TextEncoder().encode(value);
+    const digest = await crypto.subtle.digest("SHA-256", data);
+    return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (loginDisabled) {
+      setError("PIN do ADM não configurado no deploy.");
+      return;
+    }
+    setChecking(true);
+    const cleanPin = pin.trim();
+    const valid = ADMIN_PIN ? cleanPin === ADMIN_PIN : (await sha256(cleanPin)) === ADMIN_PIN_SHA256;
+    setChecking(false);
+    if (!valid) {
+      setError("PIN inválido.");
+      return;
+    }
+    sessionStorage.setItem(ADMIN_SESSION_KEY, "ok");
+    onLogin();
+  }
+
+  return (
+    <AppShell>
+      <Header title="Organização" backTo="/" />
+      <main className="px-5 pt-4">
+        <form
+          onSubmit={submit}
+          className="animate-fade-in-up space-y-4 rounded-3xl border border-white/10 bg-white/[0.05] p-5"
+        >
+          <div>
+            <p className="text-sm font-extrabold uppercase tracking-wide text-coral">Acesso ADM</p>
+            <p className="mt-1 text-xs font-semibold text-cream/60">
+              Digite o PIN da organização para operar confrontos, quadras e resultados.
+            </p>
+          </div>
+          <FormInput
+            label="PIN da organização"
+            type="password"
+            inputMode="numeric"
+            value={pin}
+            onChange={(e) => setPin(e.target.value)}
+            placeholder="••••••"
+            autoComplete="off"
+          />
+          {error && <p className="text-sm font-bold text-coral">{error}</p>}
+          <Button full type="submit" disabled={loginDisabled || checking}>
+            {checking ? "Verificando…" : "Entrar"}
+          </Button>
+          {loginDisabled && (
+            <p className="rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-xs font-bold text-amber-300">
+              Configure VITE_ADMIN_PIN no ambiente de deploy antes do evento.
+            </p>
+          )}
+        </form>
+      </main>
+    </AppShell>
+  );
 }
 
 function NewMatchForm({ categories, teams, onCreated, onClose }: NewMatchFormProps) {
@@ -187,6 +264,7 @@ function NewMatchForm({ categories, teams, onCreated, onClose }: NewMatchFormPro
 }
 
 export default function Org() {
+  const [adminAuthed, setAdminAuthed] = useState(() => sessionStorage.getItem(ADMIN_SESSION_KEY) === "ok");
   const [tab, setTab] = useState("ops");
   const [category, setCategory] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -240,6 +318,16 @@ export default function Org() {
 
   const capitaoLink = `${window.location.origin}${import.meta.env.BASE_URL}capitao`;
   const telaoLink = `${window.location.origin}${import.meta.env.BASE_URL}telao`;
+
+  if (!adminAuthed) {
+    return <AdminLogin onLogin={() => setAdminAuthed(true)} />;
+  }
+
+  function logoutAdmin() {
+    sessionStorage.removeItem(ADMIN_SESSION_KEY);
+    setAdminAuthed(false);
+    setSelectedId(null);
+  }
 
   return (
     <AppShell withBottomNav>
@@ -448,6 +536,11 @@ export default function Org() {
                   Link do telão
                 </p>
                 <p className="break-all font-mono text-sm font-bold text-coral">{telaoLink}</p>
+              </div>
+              <div className="border-t border-white/10 pt-4">
+                <Button full variant="ghost" onClick={logoutAdmin}>
+                  Sair do ADM
+                </Button>
               </div>
             </div>
           </section>
