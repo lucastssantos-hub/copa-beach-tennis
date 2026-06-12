@@ -190,6 +190,222 @@ export function computeStandings(matches: Match[], results: Result[]): StandingR
 }
 
 // ---------------------------------------------------------------------------
+// Eliminatórias pós-grupos
+// ---------------------------------------------------------------------------
+export const KNOCKOUT_PHASES = ["Quartas de final", "Semifinal", "Final", "Disputa de 3º lugar"] as const;
+export type KnockoutPhase = (typeof KNOCKOUT_PHASES)[number];
+
+export interface TeamSlot {
+  id: string | null;
+  name: string;
+  abbreviation: string | null;
+  flag: string | null;
+  seedLabel?: string;
+}
+
+export interface KnockoutMatchPlan {
+  phase: KnockoutPhase;
+  round: string;
+  teamA: TeamSlot;
+  teamB: TeamSlot;
+}
+
+export interface KnockoutPlan {
+  label: string;
+  reason: string | null;
+  rows: KnockoutMatchPlan[];
+}
+
+export function isGroupPhase(value: string | null): value is string {
+  return /^Grupo\s+\d+$/i.test((value ?? "").trim());
+}
+
+export function isKnockoutPhase(value: string | null): value is KnockoutPhase {
+  return KNOCKOUT_PHASES.includes((value ?? "") as KnockoutPhase);
+}
+
+function groupNumber(value: string): number {
+  const [, n] = value.match(/\d+/) ?? [];
+  return Number(n) || 0;
+}
+
+function sideSlot(match: Match, side: "a" | "b", seedLabel?: string): TeamSlot {
+  return {
+    id: sideTeamId(match, side),
+    name: sideTeamName(match, side),
+    abbreviation: side === "a" ? match.team_a_abbreviation : match.team_b_abbreviation,
+    flag: side === "a" ? match.team_a_flag : match.team_b_flag,
+    seedLabel,
+  };
+}
+
+function slotFromStanding(row: StandingRow, groupMatches: Match[], seedLabel: string): TeamSlot {
+  for (const m of groupMatches) {
+    if (m.team_a_id === row.key || m.team_a_name === row.name) return sideSlot(m, "a", seedLabel);
+    if (m.team_b_id === row.key || m.team_b_name === row.name) return sideSlot(m, "b", seedLabel);
+  }
+  return {
+    id: null,
+    name: row.name,
+    abbreviation: row.abbreviation,
+    flag: row.flag,
+    seedLabel,
+  };
+}
+
+function orderedKnockoutMatches(matches: Match[], phase: KnockoutPhase): Match[] {
+  return matches
+    .filter((m) => m.group_or_phase === phase)
+    .sort((a, b) => {
+      const an = Number(a.round?.match(/\d+/)?.[0] ?? 0);
+      const bn = Number(b.round?.match(/\d+/)?.[0] ?? 0);
+      if (an !== bn) return an - bn;
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
+}
+
+function completed(matches: Match[]): boolean {
+  return matches.length > 0 && matches.every((m) => isTerminal(m.match_status));
+}
+
+function winnerSlot(match: Match, results: Result[], seedLabel?: string): TeamSlot | null {
+  const side = matchWinnerSide(match, results);
+  return side ? sideSlot(match, side, seedLabel) : null;
+}
+
+function loserSlot(match: Match, results: Result[], seedLabel?: string): TeamSlot | null {
+  const side = matchWinnerSide(match, results);
+  if (!side) return null;
+  return sideSlot(match, side === "a" ? "b" : "a", seedLabel);
+}
+
+export function buildInitialKnockoutPlan(categoryName: string, matches: Match[], results: Result[]): KnockoutPlan {
+  const categoryMatches = matches.filter((m) => m.category_name === categoryName);
+  const knockoutExists = categoryMatches.some((m) => isKnockoutPhase(m.group_or_phase));
+  if (knockoutExists) {
+    return { label: "Eliminatórias já criadas", reason: "Esta categoria já tem confrontos eliminatórios.", rows: [] };
+  }
+
+  const groups = [...new Set(categoryMatches.map((m) => m.group_or_phase).filter(isGroupPhase))]
+    .sort((a, b) => groupNumber(a) - groupNumber(b));
+  if (![1, 2, 4].includes(groups.length)) {
+    return {
+      label: "Aguardando grupos",
+      reason: "As eliminatórias automáticas esperam 1, 2 ou 4 grupos fechados.",
+      rows: [],
+    };
+  }
+
+  const standingsByGroup = groups.map((group) => {
+    const groupMatches = categoryMatches.filter((m) => m.group_or_phase === group);
+    const allFinished = groupMatches.length > 0 && groupMatches.every((m) => isTerminal(m.match_status));
+    const standings = computeStandings(groupMatches, results);
+    return { group, groupMatches, allFinished, standings };
+  });
+
+  const pendingGroup = standingsByGroup.find((g) => !g.allFinished || g.standings.length < 2);
+  if (pendingGroup) {
+    return {
+      label: "Aguardando grupos",
+      reason: `${pendingGroup.group} ainda não tem todos os confrontos finalizados com 2 classificados.`,
+      rows: [],
+    };
+  }
+
+  const seed = (groupIndex: number, position: 0 | 1) => {
+    const g = standingsByGroup[groupIndex];
+    return slotFromStanding(g.standings[position], g.groupMatches, `${position + 1}º G${groupIndex + 1}`);
+  };
+
+  if (groups.length === 1) {
+    return {
+      label: "Final direta",
+      reason: null,
+      rows: [{ phase: "Final", round: "Final", teamA: seed(0, 0), teamB: seed(0, 1) }],
+    };
+  }
+
+  if (groups.length === 2) {
+    return {
+      label: "Semifinais",
+      reason: null,
+      rows: [
+        { phase: "Semifinal", round: "Semifinal 1", teamA: seed(0, 0), teamB: seed(1, 1) },
+        { phase: "Semifinal", round: "Semifinal 2", teamA: seed(1, 0), teamB: seed(0, 1) },
+      ],
+    };
+  }
+
+  return {
+    label: "Quartas de final",
+    reason: null,
+    rows: [
+      { phase: "Quartas de final", round: "Quartas 1", teamA: seed(0, 0), teamB: seed(3, 1) },
+      { phase: "Quartas de final", round: "Quartas 2", teamA: seed(1, 0), teamB: seed(2, 1) },
+      { phase: "Quartas de final", round: "Quartas 3", teamA: seed(2, 0), teamB: seed(1, 1) },
+      { phase: "Quartas de final", round: "Quartas 4", teamA: seed(3, 0), teamB: seed(0, 1) },
+    ],
+  };
+}
+
+export function buildNextKnockoutPlan(categoryName: string, matches: Match[], results: Result[]): KnockoutPlan {
+  const categoryMatches = matches.filter((m) => m.category_name === categoryName);
+  const quarters = orderedKnockoutMatches(categoryMatches, "Quartas de final");
+  const semis = orderedKnockoutMatches(categoryMatches, "Semifinal");
+  const finals = orderedKnockoutMatches(categoryMatches, "Final");
+  const thirdPlace = orderedKnockoutMatches(categoryMatches, "Disputa de 3º lugar");
+
+  if (quarters.length > 0 && semis.length === 0) {
+    if (quarters.length !== 4) {
+      return { label: "Quartas incompletas", reason: "A categoria tem quartas criadas em quantidade diferente de 4.", rows: [] };
+    }
+    if (!completed(quarters)) {
+      return { label: "Aguardando quartas", reason: "Finalize todas as quartas para gerar as semifinais.", rows: [] };
+    }
+    const winners = quarters.map((m, i) => winnerSlot(m, results, `Vencedor Q${i + 1}`));
+    if (winners.some((w) => !w)) {
+      return { label: "Aguardando quartas", reason: "Há quartas finalizadas sem vencedor definido.", rows: [] };
+    }
+    return {
+      label: "Semifinais",
+      reason: null,
+      rows: [
+        { phase: "Semifinal", round: "Semifinal 1", teamA: winners[0]!, teamB: winners[1]! },
+        { phase: "Semifinal", round: "Semifinal 2", teamA: winners[2]!, teamB: winners[3]! },
+      ],
+    };
+  }
+
+  if (semis.length > 0 && (finals.length === 0 || thirdPlace.length === 0)) {
+    if (semis.length !== 2) {
+      return { label: "Semifinais incompletas", reason: "A categoria tem semifinais criadas em quantidade diferente de 2.", rows: [] };
+    }
+    if (!completed(semis)) {
+      return { label: "Aguardando semifinais", reason: "Finalize as semifinais para gerar final e 3º lugar.", rows: [] };
+    }
+    const winners = semis.map((m, i) => winnerSlot(m, results, `Vencedor SF${i + 1}`));
+    const losers = semis.map((m, i) => loserSlot(m, results, `Perdedor SF${i + 1}`));
+    if (winners.some((w) => !w) || losers.some((l) => !l)) {
+      return { label: "Aguardando semifinais", reason: "Há semifinal finalizada sem vencedor definido.", rows: [] };
+    }
+    const rows: KnockoutMatchPlan[] = [];
+    if (thirdPlace.length === 0) {
+      rows.push({ phase: "Disputa de 3º lugar", round: "3º lugar", teamA: losers[0]!, teamB: losers[1]! });
+    }
+    if (finals.length === 0) {
+      rows.push({ phase: "Final", round: "Final", teamA: winners[0]!, teamB: winners[1]! });
+    }
+    return { label: "Final e 3º lugar", reason: null, rows };
+  }
+
+  if (finals.length > 0) {
+    return { label: "Chave completa", reason: "A final desta categoria já foi criada.", rows: [] };
+  }
+
+  return buildInitialKnockoutPlan(categoryName, matches, results);
+}
+
+// ---------------------------------------------------------------------------
 // Geração de chaves: distribuição em serpentina + round-robin (algoritmo do círculo)
 // ---------------------------------------------------------------------------
 export function distributeGroups<T>(teams: T[], groupCount: number): T[][] {

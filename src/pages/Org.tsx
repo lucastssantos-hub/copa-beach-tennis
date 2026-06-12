@@ -10,11 +10,12 @@ import EmptyState from "../components/EmptyState";
 import Button from "../components/Button";
 import FormInput, { FormSelect } from "../components/FormInput";
 import GroupGenerator from "../components/GroupGenerator";
+import KnockoutGenerator from "../components/KnockoutGenerator";
 import StandingsTable from "../components/StandingsTable";
 import { useTable } from "../lib/useTable";
 import { supabase, supabaseConfigured } from "../lib/supabase";
 import { createAuditLog } from "../lib/actions";
-import { READINESS_BUCKETS, readinessBucket, type ReadinessBucket } from "../lib/engine";
+import { READINESS_BUCKETS, isGroupPhase, readinessBucket, type ReadinessBucket } from "../lib/engine";
 import {
   CATEGORY_CHIPS,
   type AuditLog,
@@ -233,7 +234,8 @@ export default function Org() {
   const classCategory = category ?? CATEGORY_CHIPS.find((c) => matches.some((m) => m.category_name === c)) ?? null;
   const classGroups = useMemo(() => {
     const inCategory = matches.filter((m) => m.category_name === classCategory);
-    return [...new Set(inCategory.map((m) => m.group_or_phase).filter(Boolean))].sort() as string[];
+    return [...new Set(inCategory.map((m) => m.group_or_phase).filter((g): g is string => isGroupPhase(g)))]
+      .sort((a, b) => Number(a.match(/\d+/)?.[0] ?? 0) - Number(b.match(/\d+/)?.[0] ?? 0));
   }, [matches, classCategory]);
 
   const capitaoLink = `${window.location.origin}${import.meta.env.BASE_URL}capitao`;
@@ -340,6 +342,12 @@ export default function Org() {
               categories={categories}
               teams={teams}
               matches={matches}
+              onGenerated={refreshMatches}
+            />
+            <KnockoutGenerator
+              categories={categories}
+              matches={matches}
+              results={results}
               onGenerated={refreshMatches}
             />
           </section>
