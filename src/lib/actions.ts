@@ -58,8 +58,21 @@ export async function upsertPresence(
   if (patch.captain_ready) stamp.ready_at = now();
   if (patch.admin_confirmed) stamp.confirmed_at = now();
 
+  if (teamId) {
+    const row: Record<string, unknown> = {
+      match_id: match.id,
+      team_id: teamId,
+      team_name: teamName,
+      ...stamp,
+    };
+    if (patch.captain_ready !== undefined) row.captain_ready = patch.captain_ready;
+    if (patch.admin_confirmed !== undefined) row.admin_confirmed = patch.admin_confirmed;
+    await supabase.from("presence").upsert(row, { onConflict: "match_id,team_id" });
+    return;
+  }
+
   let query = supabase.from("presence").select("id").eq("match_id", match.id).limit(1);
-  query = teamId ? query.eq("team_id", teamId) : query.eq("team_name", teamName);
+  query = query.eq("team_name", teamName);
   const { data: existing } = await query;
   if (existing && existing.length > 0) {
     await supabase.from("presence").update(stamp).eq("id", existing[0].id);
@@ -98,6 +111,17 @@ export async function saveLineup(
   status: "Rascunho" | "Enviada",
 ): Promise<string | null> {
   if (!supabase) return "Supabase não configurado.";
+  if (status === "Rascunho" && team.id) {
+    const { data: current } = await supabase
+      .from("lineups")
+      .select("lineup_status")
+      .eq("match_id", match.id)
+      .eq("team_id", team.id)
+      .maybeSingle();
+    if (current?.lineup_status === "Enviada") {
+      return "Escalação já enviada. Procure a organização para reabrir alterações.";
+    }
+  }
   const row = {
     match_id: match.id,
     category_name: match.category_name,
@@ -110,14 +134,19 @@ export async function saveLineup(
     submitted_at: status === "Enviada" ? now() : null,
     updated_at: now(),
   };
-  let query = supabase.from("lineups").select("id").eq("match_id", match.id).limit(1);
-  query = team.id ? query.eq("team_id", team.id) : query.eq("team_name", team.team_name);
-  const { data: existing } = await query;
-  const { error } =
-    existing && existing.length > 0
-      ? await supabase.from("lineups").update(row).eq("id", existing[0].id)
-      : await supabase.from("lineups").insert(row);
-  if (error) return error.message;
+  if (team.id) {
+    const { error } = await supabase.from("lineups").upsert(row, { onConflict: "match_id,team_id" });
+    if (error) return error.message;
+  } else {
+    let query = supabase.from("lineups").select("id").eq("match_id", match.id).limit(1);
+    query = query.eq("team_name", team.team_name);
+    const { data: existing } = await query;
+    const { error } =
+      existing && existing.length > 0
+        ? await supabase.from("lineups").update(row).eq("id", existing[0].id)
+        : await supabase.from("lineups").insert(row);
+    if (error) return error.message;
+  }
   if (status === "Rascunho") return null;
 
   await createNotification({
@@ -268,10 +297,10 @@ export async function recordGameResult(
     updated_at: now(),
   };
   const existing = existingResults.find((r) => r.match_id === match.id && r.game_type === gameType);
-  if (existing) {
+  if (existing?.id) {
     await supabase.from("results").update(row).eq("id", existing.id);
   } else {
-    await supabase.from("results").insert(row);
+    await supabase.from("results").upsert(row, { onConflict: "match_id,game_type" });
   }
 
   // Reavalia o confronto com o resultado novo em mãos.
@@ -409,10 +438,10 @@ export async function recordWalkover(
       updated_at: now(),
     };
     const existing = existingResults.find((r) => r.match_id === match.id && r.game_type === gameType);
-    if (existing) {
+    if (existing?.id) {
       await supabase.from("results").update(row).eq("id", existing.id);
     } else {
-      await supabase.from("results").insert(row);
+      await supabase.from("results").upsert(row, { onConflict: "match_id,game_type" });
     }
   }
   await supabase

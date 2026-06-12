@@ -180,12 +180,26 @@ function GameResultForm({
 
   const [winner, setWinner] = useState<"a" | "b" | null>(null);
   const [score, setScore] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function save() {
     if (!winner) return;
+    const cleanScore = score.trim();
+    const parsed = cleanScore.match(/^(\d{1,2})\s*-\s*(\d{1,2})$/);
+    if (!parsed) {
+      setError("Informe o placar no formato 6-3.");
+      return;
+    }
+    const winnerGames = Number(parsed[1]);
+    const loserGames = Number(parsed[2]);
+    if (winnerGames <= loserGames) {
+      setError("Use a convenção vencedor-perdedor. O primeiro número precisa ser maior.");
+      return;
+    }
+    setError(null);
     setBusy(true);
-    await recordGameResult(match, results, gameType, winner, score);
+    await recordGameResult(match, results, gameType, winner, `${winnerGames}-${loserGames}`);
     setBusy(false);
     onChanged();
   }
@@ -235,6 +249,7 @@ function GameResultForm({
           {busy ? "…" : "Salvar"}
         </Button>
       </div>
+      {error && <p className="text-xs font-bold text-coral">{error}</p>}
     </div>
   );
 }

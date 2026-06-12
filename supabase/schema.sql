@@ -112,6 +112,9 @@ create table if not exists lineups (
   updated_at timestamp default now()
 );
 
+create unique index if not exists lineups_match_team_unique
+  on public.lineups (match_id, team_id);
+
 -- ------------------------------------------------------------
 -- Presença na arena
 -- ------------------------------------------------------------
@@ -127,6 +130,9 @@ create table if not exists presence (
   created_at timestamp default now(),
   updated_at timestamp default now()
 );
+
+create unique index if not exists presence_match_team_unique
+  on public.presence (match_id, team_id);
 
 -- ------------------------------------------------------------
 -- Quadras
@@ -166,6 +172,9 @@ create table if not exists results (
   created_at timestamp default now(),
   updated_at timestamp default now()
 );
+
+create unique index if not exists results_match_game_unique
+  on public.results (match_id, game_type);
 
 -- ------------------------------------------------------------
 -- Notificações
