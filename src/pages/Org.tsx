@@ -637,7 +637,7 @@ export default function Org() {
   }
 
   return (
-    <AppShell withBottomNav>
+    <AppShell withBottomNav width="wide">
       <Header title="Organização" backTo="/" />
       <MultiCategoryFilter categories={CATEGORY_CHIPS} selected={selectedCategories} onChange={setSelectedCategories} />
 

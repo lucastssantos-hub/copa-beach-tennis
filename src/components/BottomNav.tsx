@@ -12,7 +12,7 @@ interface BottomNavProps {
 export default function BottomNav({ items, active, onChange }: BottomNavProps) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-roxo-escuro/90 backdrop-blur-lg">
-      <div className="mx-auto flex w-full max-w-lg items-stretch justify-between px-2 pb-[max(env(safe-area-inset-bottom),8px)] pt-2">
+      <div className="mx-auto flex w-full max-w-7xl items-stretch justify-between px-2 pb-[max(env(safe-area-inset-bottom),8px)] pt-2 sm:px-5">
         {items.map((item) => {
           const isActive = item.id === active;
           return (
