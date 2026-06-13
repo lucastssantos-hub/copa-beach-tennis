@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "../components/AppShell";
 import Header from "../components/Header";
+import CategoryChips from "../components/CategoryChips";
 import EmptyState from "../components/EmptyState";
 import Button from "../components/Button";
 import FormInput, { FormSelect } from "../components/FormInput";
@@ -26,7 +27,7 @@ import {
   teamSide,
   winnerSide,
 } from "../lib/engine";
-import type { Athlete, Lineup, Match, Presence, Result, Team } from "../lib/types";
+import { CATEGORY_CHIPS, type Athlete, type Lineup, type Match, type Presence, type Result, type Team } from "../lib/types";
 
 const SESSION_KEY = "copa-capitao-team";
 const WARMUP_KEY = "copa-capitao-warmup";
@@ -564,6 +565,7 @@ function CaptainPanel({ team, onLogout }: { team: Team; onLogout: () => void }) 
   const { data: results, refresh: refreshResults } = useTable<Result>("results", { pollMs: 15000 });
   const { data: athletes } = useTable<Athlete>("athletes", { pollMs: 60000 });
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [category, setCategory] = useState<string | null>(null);
   const [warmup, setWarmup] = useState<Warmup | null>(loadWarmup);
   const [warmupOpen, setWarmupOpen] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -607,14 +609,29 @@ function CaptainPanel({ team, onLogout }: { team: Team; onLogout: () => void }) 
     [matches, team],
   );
 
-  const ativos = teamMatches.filter((m) => !isTerminal(m.match_status));
-  const historico = teamMatches.filter((m) => isTerminal(m.match_status));
   const selected = teamMatches.find((m) => m.id === selectedId) ?? null;
-  const categories = [...new Set(teamMatches.map((m) => m.category_name).filter(Boolean))] as string[];
+  const categories = useMemo(() => {
+    const available = [...new Set(teamMatches.map((m) => m.category_name).filter(Boolean))] as string[];
+    return available.sort((a, b) => {
+      const indexA = CATEGORY_CHIPS.indexOf(a);
+      const indexB = CATEGORY_CHIPS.indexOf(b);
+      if (indexA !== -1 || indexB !== -1) return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+      return a.localeCompare(b, "pt-BR", { numeric: true });
+    });
+  }, [teamMatches]);
+  const filteredMatches = category ? teamMatches.filter((m) => m.category_name === category) : teamMatches;
+  const ativos = filteredMatches.filter((m) => !isTerminal(m.match_status));
+  const historico = filteredMatches.filter((m) => isTerminal(m.match_status));
   // O confronto vem da lista viva (polling) — a quadra aparece assim que o ADM liberar.
   const warmupMatch = warmup ? teamMatches.find((m) => m.id === warmup.matchId) ?? null : null;
   const warmupRemaining = warmup ? warmup.deadline - now : 0;
   const warmupEnded = warmup !== null && warmupRemaining <= 0;
+
+  useEffect(() => {
+    if (category && !categories.includes(category)) {
+      setCategory(null);
+    }
+  }, [category, categories]);
 
   return (
     <div className="space-y-4 px-5 pt-2">
@@ -726,6 +743,12 @@ function CaptainPanel({ team, onLogout }: { team: Team; onLogout: () => void }) 
         </button>
       </div>
 
+      {categories.length > 1 && (
+        <div className="-mx-5">
+          <CategoryChips categories={categories} selected={category} onSelect={setCategory} allLabel="Todas" />
+        </div>
+      )}
+
       <section className="space-y-3">
         <h2 className="text-sm font-extrabold uppercase tracking-[0.18em] text-cream/70">
           Próximos confrontos
@@ -734,7 +757,7 @@ function CaptainPanel({ team, onLogout }: { team: Team; onLogout: () => void }) 
           <EmptyState
             icon="🆚"
             title="Nenhum confronto ativo"
-            message="Aguarde a organização cadastrar os confrontos."
+            message={category ? `Sem confrontos ativos na categoria ${category}.` : "Aguarde a organização cadastrar os confrontos."}
           />
         ) : (
           ativos.map((m) => <CaptainMatchCard key={m.id} match={m} onClick={() => setSelectedId(m.id)} />)
@@ -744,7 +767,11 @@ function CaptainPanel({ team, onLogout }: { team: Team; onLogout: () => void }) 
       <section className="space-y-3">
         <h2 className="text-sm font-extrabold uppercase tracking-[0.18em] text-cream/70">Histórico</h2>
         {historico.length === 0 ? (
-          <EmptyState icon="🏆" title="Sem partidas finalizadas" message="Os resultados aparecerão aqui." />
+          <EmptyState
+            icon="🏆"
+            title="Sem partidas finalizadas"
+            message={category ? `Sem resultados finalizados na categoria ${category}.` : "Os resultados aparecerão aqui."}
+          />
         ) : (
           historico.map((m) => <CaptainMatchCard key={m.id} match={m} onClick={() => setSelectedId(m.id)} />)
         )}
