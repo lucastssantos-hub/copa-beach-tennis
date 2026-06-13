@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import AppShell from "../components/AppShell";
 import Header from "../components/Header";
-import CategoryChips from "../components/CategoryChips";
 import BottomNav from "../components/BottomNav";
 import MatchDetail from "../components/MatchDetail";
 import MatchReadinessCard from "../components/MatchReadinessCard";
@@ -81,6 +80,70 @@ function groupMatchesByPhase(matches: Match[]) {
       ),
     }))
     .sort((a, b) => groupOrder(a.label) - groupOrder(b.label) || a.label.localeCompare(b.label, "pt-BR", { numeric: true }));
+}
+
+function formatCategoryFilter(categories: string[]) {
+  if (categories.length === 0) return null;
+  if (categories.length === 1) return categories[0];
+  return categories.join(", ");
+}
+
+function MultiCategoryFilter({
+  categories,
+  selected,
+  onChange,
+}: {
+  categories: string[];
+  selected: string[];
+  onChange: (categories: string[]) => void;
+}) {
+  function toggle(category: string) {
+    onChange(
+      selected.includes(category)
+        ? selected.filter((item) => item !== category)
+        : [...selected, category],
+    );
+  }
+
+  return (
+    <div className="space-y-2 px-5 pb-1">
+      <div className="flex gap-2 overflow-x-auto">
+        <button
+          type="button"
+          onClick={() => onChange([])}
+          className={`shrink-0 rounded-full border px-4 py-2 text-xs font-extrabold uppercase tracking-wide transition ${
+            selected.length === 0
+              ? "border-coral bg-coral text-branco-quente shadow-[0_4px_16px_rgba(255,90,78,0.4)]"
+              : "border-white/15 bg-white/5 text-cream/80"
+          }`}
+        >
+          Todas
+        </button>
+        {categories.map((cat) => {
+          const active = selected.includes(cat);
+          return (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => toggle(cat)}
+              className={`shrink-0 rounded-full border px-4 py-2 text-xs font-extrabold uppercase tracking-wide transition ${
+                active
+                  ? "border-coral bg-coral text-branco-quente shadow-[0_4px_16px_rgba(255,90,78,0.4)]"
+                  : "border-white/15 bg-white/5 text-cream/80"
+              }`}
+            >
+              {cat}
+            </button>
+          );
+        })}
+      </div>
+      {selected.length > 1 && (
+        <p className="text-[11px] font-bold uppercase tracking-wider text-cream/50">
+          Visualizando {selected.length} categorias: {formatCategoryFilter(selected)}
+        </p>
+      )}
+    </div>
+  );
 }
 
 interface NewMatchFormProps {
@@ -483,7 +546,7 @@ function CaptainAccessManager() {
 export default function Org() {
   const [adminAuthed, setAdminAuthed] = useState(() => sessionStorage.getItem(ADMIN_SESSION_KEY) === "ok");
   const [tab, setTab] = useState("ops");
-  const [category, setCategory] = useState<string | null>(null);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [bucket, setBucket] = useState<ReadinessBucket>("pendentes");
@@ -506,9 +569,14 @@ export default function Org() {
   const { data: presence, refresh: refreshPresence } = useTable<Presence>("presence", { pollMs: 10000 });
   const { data: results, refresh: refreshResults } = useTable<Result>("results", { pollMs: 10000 });
 
+  const categoryFilterLabel = formatCategoryFilter(selectedCategories);
+  const primaryCategory = selectedCategories[0] ?? null;
   const filteredMatches = useMemo(
-    () => (category ? matches.filter((m) => m.category_name === category) : matches),
-    [matches, category],
+    () =>
+      selectedCategories.length > 0
+        ? matches.filter((m) => m.category_name !== null && selectedCategories.includes(m.category_name))
+        : matches,
+    [matches, selectedCategories],
   );
 
   // Prontidão (formato Lovable): confrontos agrupados por estágio do fluxo.
@@ -528,7 +596,7 @@ export default function Org() {
   }
 
   // CLASS: grupos da categoria escolhida (ou da primeira com confrontos)
-  const classCategory = category ?? CATEGORY_CHIPS.find((c) => matches.some((m) => m.category_name === c)) ?? null;
+  const classCategory = primaryCategory ?? CATEGORY_CHIPS.find((c) => matches.some((m) => m.category_name === c)) ?? null;
   const classGroups = useMemo(() => {
     const inCategory = matches.filter((m) => m.category_name === classCategory);
     return [...new Set(inCategory.map((m) => m.group_or_phase).filter((g): g is string => isGroupPhase(g)))]
@@ -550,7 +618,7 @@ export default function Org() {
   }
 
   function collapseKey(label: string) {
-    return `${category ?? "todas"}:${bucket}:${label}`;
+    return `${selectedCategories.join(",") || "todas"}:${bucket}:${label}`;
   }
 
   function toggleGroup(label: string, rows: Match[]) {
@@ -571,7 +639,7 @@ export default function Org() {
   return (
     <AppShell withBottomNav>
       <Header title="Organização" backTo="/" />
-      <CategoryChips categories={CATEGORY_CHIPS} selected={category} onSelect={setCategory} />
+      <MultiCategoryFilter categories={CATEGORY_CHIPS} selected={selectedCategories} onChange={setSelectedCategories} />
 
       <main className="flex-1 px-5 pt-5">
         {!supabaseConfigured && (
@@ -656,7 +724,7 @@ export default function Org() {
               <EmptyState
                 icon="🆚"
                 title="Nenhum confronto nesta lista"
-                message={category ? `Sem confrontos da categoria ${category} neste estágio.` : "Os confrontos aparecem aqui conforme avançam no fluxo."}
+                message={categoryFilterLabel ? `Sem confrontos das categorias ${categoryFilterLabel} neste estágio.` : "Os confrontos aparecem aqui conforme avançam no fluxo."}
               />
             ) : (
               <div className="grid gap-4 xl:grid-cols-2">
