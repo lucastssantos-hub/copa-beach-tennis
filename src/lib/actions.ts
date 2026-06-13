@@ -121,7 +121,7 @@ export interface LineupPlayers {
 
 /**
  * Salva a escalação da equipe no confronto (upsert por match+team).
- * status 'Enviada' trava a escalação, notifica a organização e avança o fluxo;
+ * status 'Enviada' notifica a organização e avança o fluxo;
  * 'Rascunho' apenas persiste para continuar depois.
  */
 export async function saveLineup(
@@ -142,6 +142,15 @@ export async function saveLineup(
       return "Escalação já enviada. Procure a organização para reabrir alterações.";
     }
   }
+  const { data: existingSent } = team.id
+    ? await supabase
+        .from("lineups")
+        .select("lineup_status")
+        .eq("match_id", match.id)
+        .eq("team_id", team.id)
+        .maybeSingle()
+    : { data: null };
+  const updatingSentLineup = status === "Enviada" && existingSent?.lineup_status === "Enviada";
   const row = {
     match_id: match.id,
     category_name: match.category_name,
@@ -171,14 +180,14 @@ export async function saveLineup(
 
   await createNotification({
     notification_type: "escalacao",
-    message: `${team.team_name} enviou escalação`,
+    message: `${team.team_name} ${updatingSentLineup ? "atualizou" : "enviou"} escalação`,
     team_id: team.id,
     team_name: team.team_name,
     match_id: match.id,
   });
   await createAuditLog({
     actor: `CAPITAO:${team.team_name}`,
-    action: "ENVIAR_ESCALACAO",
+    action: updatingSentLineup ? "ATUALIZAR_ESCALACAO" : "ENVIAR_ESCALACAO",
     entity: "lineups",
     details: `Confronto ${match.team_a_name} x ${match.team_b_name}`,
   });

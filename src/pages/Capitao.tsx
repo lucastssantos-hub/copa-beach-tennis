@@ -204,6 +204,22 @@ const EMPTY_PLAYERS: LineupPlayers = {
   mixed_player_2: "",
 };
 
+function lineupToPlayers(lineup: Lineup | null): LineupPlayers {
+  return {
+    ...EMPTY_PLAYERS,
+    ...(lineup
+      ? {
+          female_player_1: lineup.female_player_1 ?? "",
+          female_player_2: lineup.female_player_2 ?? "",
+          male_player_1: lineup.male_player_1 ?? "",
+          male_player_2: lineup.male_player_2 ?? "",
+          mixed_player_1: lineup.mixed_player_1 ?? "",
+          mixed_player_2: lineup.mixed_player_2 ?? "",
+        }
+      : {}),
+  };
+}
+
 function GameCell({ label, result, match }: { label: string; result: Result | null; match: Match }) {
   const w = winnerSide(match, result);
   return (
@@ -280,7 +296,7 @@ function CaptainMatchView({
   const side = teamSide(match, team);
   const myLineup = side ? sideLineup(match, lineups, side) : null;
   const myPresence = side ? sidePresence(match, presence, side) : null;
-  const locked = myLineup?.lineup_status === "Enviada";
+  const submitted = myLineup?.lineup_status === "Enviada";
   const games = resultsFor(match, results);
   const mistaNeeded = needsMista(match, results);
   const terminal = isTerminal(match.match_status);
@@ -289,27 +305,29 @@ function CaptainMatchView({
   const showResultCard =
     terminal || contested || ["Em andamento", "Resultado pendente"].includes(match.match_status);
 
-  const [players, setPlayers] = useState<LineupPlayers>({
-    ...EMPTY_PLAYERS,
-    ...(myLineup
-      ? {
-          female_player_1: myLineup.female_player_1 ?? "",
-          female_player_2: myLineup.female_player_2 ?? "",
-          male_player_1: myLineup.male_player_1 ?? "",
-          male_player_2: myLineup.male_player_2 ?? "",
-          mixed_player_1: myLineup.mixed_player_1 ?? "",
-          mixed_player_2: myLineup.mixed_player_2 ?? "",
-        }
-      : {}),
-  });
+  const [players, setPlayers] = useState<LineupPlayers>(() => lineupToPlayers(myLineup));
+  const [editingSubmitted, setEditingSubmitted] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [contesting, setContesting] = useState(false);
   const [reason, setReason] = useState("");
 
+  useEffect(() => {
+    if (!editingSubmitted) {
+      setPlayers(lineupToPlayers(myLineup));
+    }
+  }, [editingSubmitted, myLineup?.id, myLineup?.updated_at]);
+
   function setPlayer(field: keyof LineupPlayers, value: string) {
     setPlayers((p) => ({ ...p, [field]: value }));
+  }
+
+  function cancelEdit() {
+    setPlayers(lineupToPlayers(myLineup));
+    setEditingSubmitted(false);
+    setError(null);
+    setFeedback(null);
   }
 
   async function save(status: "Rascunho" | "Enviada") {
@@ -335,6 +353,11 @@ function CaptainMatchView({
     }
     onChanged();
     if (status === "Enviada") {
+      if (submitted || editingSubmitted) {
+        setEditingSubmitted(false);
+        setFeedback("Escalação atualizada.");
+        return;
+      }
       // Volta para a lista de confrontos e abre o popup de quadra + aquecimento.
       onSent();
       return;
@@ -410,6 +433,7 @@ function CaptainMatchView({
       dim: !mistaNeeded,
     },
   ];
+  const locked = submitted && !editingSubmitted;
 
   return (
     <div className="animate-fade-in-up space-y-4 px-5 pt-2">
@@ -495,7 +519,20 @@ function CaptainMatchView({
             </p>
           )}
 
-          {!locked && (
+          {submitted && !editingSubmitted ? (
+            <Button variant="secondary" full disabled={busy !== null} onClick={() => setEditingSubmitted(true)}>
+              Editar escalação
+            </Button>
+          ) : submitted && editingSubmitted ? (
+            <div className="flex gap-2">
+              <Button variant="ghost" className="flex-1" disabled={busy !== null} onClick={cancelEdit}>
+                Cancelar
+              </Button>
+              <Button className="flex-1" disabled={busy !== null} onClick={() => save("Enviada")}>
+                {busy === "Enviada" ? "Salvando…" : "Salvar alterações"}
+              </Button>
+            </div>
+          ) : (
             <div className="flex gap-2">
               <Button variant="ghost" className="flex-1" disabled={busy !== null} onClick={() => save("Rascunho")}>
                 {busy === "Rascunho" ? "Salvando…" : "💾 Rascunho"}
