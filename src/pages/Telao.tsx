@@ -4,7 +4,10 @@ import CourtCard from "../components/CourtCard";
 import MatchCard from "../components/MatchCard";
 import EmptyState from "../components/EmptyState";
 import StatusPill from "../components/StatusPill";
+import StandingsTable from "../components/StandingsTable";
 import { useTable } from "../lib/useTable";
+import { isGroupPhase } from "../lib/engine";
+import { CATEGORY_CHIPS } from "../lib/types";
 import type { Court, Match, Result } from "../lib/types";
 
 const UPCOMING_STATUSES = [
@@ -40,6 +43,17 @@ export default function Telao() {
   const upcoming = matches
     .filter((m) => UPCOMING_STATUSES.includes(m.match_status))
     .slice(0, 6);
+  const standingsCategory = CATEGORY_CHIPS.find((cat) =>
+    matches.some((m) => m.category_name === cat && isGroupPhase(m.group_or_phase)),
+  ) ?? null;
+  const standingsGroups = standingsCategory
+    ? [...new Set(matches
+      .filter((m) => m.category_name === standingsCategory)
+      .map((m) => m.group_or_phase)
+      .filter((group): group is string => isGroupPhase(group)))]
+      .sort((a, b) => Number(a.match(/\d+/)?.[0] ?? 0) - Number(b.match(/\d+/)?.[0] ?? 0))
+      .slice(0, 2)
+    : [];
 
   return (
     <AppShell>
@@ -103,6 +117,24 @@ export default function Telao() {
               </div>
             ))}
           </div>
+        )}
+      </Section>
+
+      <Section title={standingsCategory ? `Classificação — Cat. ${standingsCategory}` : "Classificação"}>
+        {standingsCategory && standingsGroups.length > 0 ? (
+          <div className="space-y-4">
+            {standingsGroups.map((group) => (
+              <div key={group} className="space-y-2">
+                <p className="text-[11px] font-extrabold uppercase tracking-widest text-cream/60">{group}</p>
+                <StandingsTable
+                  matches={matches.filter((m) => m.category_name === standingsCategory && m.group_or_phase === group)}
+                  results={results}
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <EmptyState icon="📊" title="Classificação indisponível" message="A classificação aparecerá quando os confrontos de grupos estiverem cadastrados." />
         )}
       </Section>
     </AppShell>

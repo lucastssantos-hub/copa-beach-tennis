@@ -43,6 +43,26 @@ export async function advanceMatchStatus(match: Match, next: MatchStatus) {
   await supabase.from("matches").update({ match_status: next, updated_at: now() }).eq("id", match.id);
 }
 
+export async function updateMatchAdmin(
+  match: Match,
+  patch: Partial<Pick<Match, "scheduled_time" | "court" | "match_mode" | "match_status">>,
+  actor = "ORG",
+): Promise<string | null> {
+  if (!supabase) return "Supabase não configurado.";
+  const { error } = await supabase
+    .from("matches")
+    .update({ ...patch, updated_at: now() })
+    .eq("id", match.id);
+  if (error) return error.message;
+  await createAuditLog({
+    actor,
+    action: "EDITAR_CONFRONTO",
+    entity: "matches",
+    details: matchLabel(match),
+  });
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Presença (capitão marca pronto; ADM confirma)
 // ---------------------------------------------------------------------------

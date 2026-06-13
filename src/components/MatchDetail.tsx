@@ -5,7 +5,7 @@
 // ============================================================================
 import { useMemo, useState } from "react";
 import Button from "./Button";
-import FormInput from "./FormInput";
+import FormInput, { FormSelect } from "./FormInput";
 import StatusPill from "./StatusPill";
 import {
   advanceMatchStatus,
@@ -14,6 +14,7 @@ import {
   releaseCourts,
   resolveContest,
   startMatch,
+  updateMatchAdmin,
   upsertPresence,
 } from "../lib/actions";
 import {
@@ -27,7 +28,7 @@ import {
   winnerSide,
   type GameType,
 } from "../lib/engine";
-import type { Court, Lineup, Match, Presence, Result } from "../lib/types";
+import { MATCH_STATUSES, type Court, type Lineup, type Match, type MatchStatus, type Presence, type Result } from "../lib/types";
 
 interface MatchDetailProps {
   match: Match;
@@ -41,6 +42,73 @@ interface MatchDetailProps {
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
     <p className="text-[11px] font-extrabold uppercase tracking-widest text-cream/60">{children}</p>
+  );
+}
+
+function AdminEditBlock({ match, onChanged }: { match: Match; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [time, setTime] = useState(match.scheduled_time ?? "");
+  const [court, setCourt] = useState(match.court ?? "");
+  const [mode, setMode] = useState(match.match_mode || "Sequencial");
+  const [status, setStatus] = useState<MatchStatus>(match.match_status);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    const err = await updateMatchAdmin(match, {
+      scheduled_time: time.trim() || null,
+      court: court.trim() || null,
+      match_mode: mode,
+      match_status: status,
+    });
+    setBusy(false);
+    if (err) {
+      setError(err);
+      return;
+    }
+    setOpen(false);
+    onChanged();
+  }
+
+  return (
+    <div className="space-y-2 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex w-full items-center justify-between text-left"
+      >
+        <span className="text-[11px] font-extrabold uppercase tracking-widest text-cream/60">
+          Editar confronto
+        </span>
+        <span className="text-sm font-extrabold text-coral">{open ? "Fechar" : "Abrir"}</span>
+      </button>
+
+      {open && (
+        <div className="space-y-3 border-t border-white/10 pt-3">
+          <div className="grid grid-cols-2 gap-3">
+            <FormInput label="Horário" value={time} onChange={(e) => setTime(e.target.value)} placeholder="09:30" />
+            <FormInput label="Quadra" value={court} onChange={(e) => setCourt(e.target.value)} placeholder="Quadra 1" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <FormSelect label="Modo" value={mode} onChange={(e) => setMode(e.target.value)}>
+              <option value="Sequencial">Sequencial</option>
+              <option value="Simultâneo">Simultâneo</option>
+            </FormSelect>
+            <FormSelect label="Status" value={status} onChange={(e) => setStatus(e.target.value as MatchStatus)}>
+              {MATCH_STATUSES.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </FormSelect>
+          </div>
+          {error && <p className="text-xs font-bold text-coral">{error}</p>}
+          <Button full disabled={busy} onClick={save}>
+            {busy ? "Salvando…" : "Salvar alterações"}
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -396,6 +464,8 @@ export default function MatchDetail({ match, courts, lineups, presence, results,
         </p>
         <StatusPill status={status} />
       </div>
+
+      <AdminEditBlock match={match} onChanged={onChanged} />
 
       {/* Escalações recebidas */}
       <div className="space-y-2">
