@@ -53,6 +53,36 @@ function formatDateTime(iso: string) {
   return d.toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
 }
 
+function groupLabel(match: Match) {
+  return match.group_or_phase || "Sem grupo";
+}
+
+function groupOrder(label: string) {
+  if (isGroupPhase(label)) return Number(label.match(/\d+/)?.[0] ?? 0);
+  if (/quartas/i.test(label)) return 90;
+  if (/semifinal/i.test(label)) return 91;
+  if (/3/.test(label)) return 92;
+  if (/final/i.test(label)) return 93;
+  return 999;
+}
+
+function groupMatchesByPhase(matches: Match[]) {
+  const map = new Map<string, Match[]>();
+  for (const match of matches) {
+    const label = groupLabel(match);
+    map.set(label, [...(map.get(label) ?? []), match]);
+  }
+  return [...map.entries()]
+    .map(([label, rows]) => ({
+      label,
+      rows: rows.sort((a, b) =>
+        (a.scheduled_time || "").localeCompare(b.scheduled_time || "") ||
+        (a.round || "").localeCompare(b.round || "", "pt-BR", { numeric: true }),
+      ),
+    }))
+    .sort((a, b) => groupOrder(a.label) - groupOrder(b.label) || a.label.localeCompare(b.label, "pt-BR", { numeric: true }));
+}
+
 interface NewMatchFormProps {
   categories: Category[];
   teams: Team[];
@@ -457,6 +487,7 @@ export default function Org() {
   const [showForm, setShowForm] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [bucket, setBucket] = useState<ReadinessBucket>("pendentes");
+  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
   const { data: matches, refresh: refreshMatches } = useTable<Match>("matches", { pollMs: 10000 });
   const { data: courts, refresh: refreshCourts } = useTable<Court>("courts", {
@@ -486,6 +517,7 @@ export default function Org() {
     for (const m of filteredMatches) groups[readinessBucket(m.match_status)].push(m);
     return groups as Record<ReadinessBucket, Match[]>;
   }, [filteredMatches]);
+  const groupedBucket = useMemo(() => groupMatchesByPhase(bucketed[bucket]), [bucketed, bucket]);
 
   function refreshOps() {
     refreshMatches();
@@ -515,6 +547,25 @@ export default function Org() {
     sessionStorage.removeItem(ADMIN_PIN_SESSION_KEY);
     setAdminAuthed(false);
     setSelectedId(null);
+  }
+
+  function collapseKey(label: string) {
+    return `${category ?? "todas"}:${bucket}:${label}`;
+  }
+
+  function toggleGroup(label: string, rows: Match[]) {
+    const key = collapseKey(label);
+    const nextCollapsed = !collapsedGroups[key];
+    if (nextCollapsed && selectedId && rows.some((m) => m.id === selectedId)) {
+      setSelectedId(null);
+    }
+    setCollapsedGroups((prev) => ({ ...prev, [key]: nextCollapsed }));
+  }
+
+  function setAllGroups(collapsed: boolean) {
+    const next = Object.fromEntries(groupedBucket.map((group) => [collapseKey(group.label), collapsed]));
+    if (collapsed) setSelectedId(null);
+    setCollapsedGroups((prev) => ({ ...prev, ...next }));
   }
 
   return (
@@ -577,6 +628,30 @@ export default function Org() {
               ))}
             </div>
 
+            {bucketed[bucket].length > 0 && (
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
+                <p className="text-[11px] font-extrabold uppercase tracking-widest text-cream/50">
+                  {groupedBucket.length} grupo{groupedBucket.length === 1 ? "" : "s"} · {bucketed[bucket].length} confronto{bucketed[bucket].length === 1 ? "" : "s"}
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAllGroups(true)}
+                    className="rounded-full border border-white/15 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-cream/70"
+                  >
+                    Minimizar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAllGroups(false)}
+                    className="rounded-full border border-coral/40 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-coral"
+                  >
+                    Abrir
+                  </button>
+                </div>
+              </div>
+            )}
+
             {bucketed[bucket].length === 0 ? (
               <EmptyState
                 icon="🆚"
@@ -584,30 +659,62 @@ export default function Org() {
                 message={category ? `Sem confrontos da categoria ${category} neste estágio.` : "Os confrontos aparecem aqui conforme avançam no fluxo."}
               />
             ) : (
-              bucketed[bucket].map((m) => (
-                <div key={m.id} className="space-y-3">
-                  <MatchReadinessCard
-                    match={m}
-                    lineups={lineups}
-                    presence={presence}
-                    results={results}
-                    selected={m.id === selectedId}
-                    onOpen={() => setSelectedId(m.id === selectedId ? null : m.id)}
-                    onEnsureOpen={() => setSelectedId(m.id)}
-                    onChanged={refreshOps}
-                  />
-                  {m.id === selectedId && (
-                    <MatchDetail
-                      match={m}
-                      courts={courts}
-                      lineups={lineups}
-                      presence={presence}
-                      results={results}
-                      onChanged={refreshOps}
-                    />
+              <div className="grid gap-4 xl:grid-cols-2">
+                {groupedBucket.map((group) => {
+                  const key = collapseKey(group.label);
+                  const collapsed = !!collapsedGroups[key];
+                  return (
+                    <section key={group.label} className="space-y-3 rounded-3xl border border-white/10 bg-white/[0.03] p-3">
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(group.label, group.rows)}
+                        className="flex w-full items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2 text-left"
+                      >
+                        <span>
+                          <span className="block text-sm font-extrabold uppercase tracking-wide text-branco-quente">
+                            {group.label}
+                          </span>
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-cream/50">
+                            {group.rows.length} confronto{group.rows.length === 1 ? "" : "s"}
+                          </span>
+                        </span>
+                        <span className="shrink-0 rounded-full border border-coral/40 px-3 py-1 text-[10px] font-extrabold uppercase tracking-wider text-coral">
+                          {collapsed ? "Abrir" : "Minimizar"}
+                        </span>
+                      </button>
+
+                      {!collapsed && (
+                        <div className="space-y-3">
+                          {group.rows.map((m) => (
+                            <div key={m.id} className="space-y-3">
+                              <MatchReadinessCard
+                                match={m}
+                                lineups={lineups}
+                                presence={presence}
+                                results={results}
+                                selected={m.id === selectedId}
+                                onOpen={() => setSelectedId(m.id === selectedId ? null : m.id)}
+                                onEnsureOpen={() => setSelectedId(m.id)}
+                                onChanged={refreshOps}
+                              />
+                              {m.id === selectedId && (
+                                <MatchDetail
+                                  match={m}
+                                  courts={courts}
+                                  lineups={lineups}
+                                  presence={presence}
+                                  results={results}
+                                  onChanged={refreshOps}
+                                />
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </section>
                   )}
-                </div>
-              ))
+                )}
+              </div>
             )}
           </section>
         )}
