@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AppShell from "../components/AppShell";
 import Header from "../components/Header";
 import CategoryChips from "../components/CategoryChips";
@@ -30,6 +30,7 @@ import {
 } from "../lib/types";
 
 const ADMIN_SESSION_KEY = "copa-org-auth";
+const ADMIN_PIN_SESSION_KEY = "copa-org-pin";
 const ADMIN_PIN =
   import.meta.env.VITE_ADMIN_PIN ||
   import.meta.env.NEXT_PUBLIC_ADMIN_PIN ||
@@ -86,6 +87,7 @@ function AdminLogin({ onLogin }: { onLogin: () => void }) {
       return;
     }
     sessionStorage.setItem(ADMIN_SESSION_KEY, "ok");
+    sessionStorage.setItem(ADMIN_PIN_SESSION_KEY, cleanPin);
     onLogin();
   }
 
@@ -263,6 +265,191 @@ function NewMatchForm({ categories, teams, onCreated, onClose }: NewMatchFormPro
   );
 }
 
+interface CaptainAccessRow {
+  team_id: string;
+  team_name: string;
+  country: string | null;
+  abbreviation: string | null;
+  flag: string | null;
+  captain_name: string | null;
+  captain_phone: string | null;
+  team_status: string;
+  access_code: string | null;
+  access_updated_at: string | null;
+}
+
+function CaptainAccessManager() {
+  const [pin, setPin] = useState(() => sessionStorage.getItem(ADMIN_PIN_SESSION_KEY) ?? "");
+  const [rows, setRows] = useState<CaptainAccessRow[]>([]);
+  const [selectedId, setSelectedId] = useState("");
+  const [captainName, setCaptainName] = useState("");
+  const [captainPhone, setCaptainPhone] = useState("");
+  const [accessCode, setAccessCode] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const selected = rows.find((row) => row.team_id === selectedId) ?? null;
+
+  async function loadAccess(currentPin = pin) {
+    if (!supabase) {
+      setError("Supabase não configurado.");
+      return;
+    }
+    const cleanPin = currentPin.trim();
+    if (!cleanPin) {
+      setError("Digite o PIN do ADM para gerenciar os acessos.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+    const { data, error: err } = await supabase.rpc("admin_list_captain_access", {
+      p_admin_pin: cleanPin,
+    });
+    setLoading(false);
+    if (err) {
+      setError(err.message);
+      return;
+    }
+    sessionStorage.setItem(ADMIN_PIN_SESSION_KEY, cleanPin);
+    const list = (data ?? []) as CaptainAccessRow[];
+    setRows(list);
+    const nextSelected = list.find((row) => row.team_id === selectedId)?.team_id ?? list[0]?.team_id ?? "";
+    setSelectedId(nextSelected);
+    setMessage(`${list.length} seleções carregadas.`);
+  }
+
+  useEffect(() => {
+    if (pin) loadAccess(pin);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!selected) {
+      setCaptainName("");
+      setCaptainPhone("");
+      setAccessCode("");
+      return;
+    }
+    setCaptainName(selected.captain_name ?? "");
+    setCaptainPhone(selected.captain_phone ?? "");
+    setAccessCode(selected.access_code ?? "");
+  }, [selected]);
+
+  function generateCode() {
+    setAccessCode(String(Math.floor(100000 + Math.random() * 900000)));
+  }
+
+  async function saveAccess(e: React.FormEvent) {
+    e.preventDefault();
+    if (!supabase || !selected) return;
+    const cleanPin = pin.trim();
+    if (!cleanPin) {
+      setError("Digite o PIN do ADM para salvar.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    const { error: err } = await supabase.rpc("admin_upsert_captain_access", {
+      p_admin_pin: cleanPin,
+      p_team_id: selected.team_id,
+      p_access_code: accessCode.trim(),
+      p_captain_name: captainName.trim(),
+      p_captain_phone: captainPhone.trim(),
+    });
+    setSaving(false);
+    if (err) {
+      setError(err.message);
+      return;
+    }
+    sessionStorage.setItem(ADMIN_PIN_SESSION_KEY, cleanPin);
+    setMessage(`${selected.team_name}: acesso salvo.`);
+    await loadAccess(cleanPin);
+  }
+
+  return (
+    <div className="animate-fade-in-up space-y-4 rounded-3xl border border-white/10 bg-white/[0.05] p-5">
+      <div>
+        <p className="text-[11px] font-bold uppercase tracking-widest text-cream/60">Acessos dos capitães</p>
+        <p className="mt-1 text-xs font-semibold text-cream/50">
+          Cadastre ou altere o código que cada capitão usa para entrar no app.
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+        <FormInput
+          label="PIN do ADM"
+          type="password"
+          inputMode="numeric"
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+          placeholder="••••••"
+          autoComplete="off"
+        />
+        <Button type="button" variant="secondary" disabled={loading} onClick={() => loadAccess()} className="self-end">
+          {loading ? "Carregando…" : "Carregar"}
+        </Button>
+      </div>
+
+      {rows.length > 0 && (
+        <form onSubmit={saveAccess} className="space-y-3">
+          <FormSelect label="Seleção" value={selectedId} onChange={(e) => setSelectedId(e.target.value)}>
+            {rows.map((row) => (
+              <option key={row.team_id} value={row.team_id}>
+                {row.flag ? `${row.flag} ` : ""}{row.team_name}{row.abbreviation ? ` (${row.abbreviation})` : ""}
+              </option>
+            ))}
+          </FormSelect>
+
+          <div className="grid grid-cols-2 gap-3">
+            <FormInput
+              label="Nome do capitão"
+              value={captainName}
+              onChange={(e) => setCaptainName(e.target.value)}
+              placeholder="Nome"
+              autoComplete="off"
+            />
+            <FormInput
+              label="Telefone"
+              value={captainPhone}
+              onChange={(e) => setCaptainPhone(e.target.value)}
+              placeholder="(82) 99999-9999"
+              autoComplete="off"
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+            <FormInput
+              label="Código de acesso"
+              value={accessCode}
+              onChange={(e) => setAccessCode(e.target.value)}
+              placeholder="Ex.: 123456"
+              autoComplete="off"
+            />
+            <Button type="button" variant="ghost" onClick={generateCode} className="self-end">
+              Gerar
+            </Button>
+          </div>
+
+          <p className="text-xs font-semibold text-cream/50">
+            Deixe o código vazio e salve para remover o acesso desta seleção.
+          </p>
+
+          <Button full type="submit" disabled={saving || !selected}>
+            {saving ? "Salvando…" : "Salvar acesso"}
+          </Button>
+        </form>
+      )}
+
+      {message && <p className="text-sm font-bold text-emerald-300">{message}</p>}
+      {error && <p className="text-sm font-bold text-coral">{error}</p>}
+    </div>
+  );
+}
+
 export default function Org() {
   const [adminAuthed, setAdminAuthed] = useState(() => sessionStorage.getItem(ADMIN_SESSION_KEY) === "ok");
   const [tab, setTab] = useState("ops");
@@ -325,6 +512,7 @@ export default function Org() {
 
   function logoutAdmin() {
     sessionStorage.removeItem(ADMIN_SESSION_KEY);
+    sessionStorage.removeItem(ADMIN_PIN_SESSION_KEY);
     setAdminAuthed(false);
     setSelectedId(null);
   }
@@ -514,6 +702,7 @@ export default function Org() {
         {tab === "cfg" && (
           <section className="space-y-3">
             <h2 className="text-lg font-extrabold text-branco-quente">Configuração</h2>
+            <CaptainAccessManager />
             <div className="animate-fade-in-up space-y-4 rounded-3xl border border-white/10 bg-white/[0.05] p-5">
               <div>
                 <p className="text-[11px] font-bold uppercase tracking-widest text-cream/60">
