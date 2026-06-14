@@ -11,6 +11,7 @@ import FormInput, { FormSelect } from "../components/FormInput";
 import GroupGenerator from "../components/GroupGenerator";
 import KnockoutGenerator from "../components/KnockoutGenerator";
 import StandingsTable from "../components/StandingsTable";
+import LetzplayPanel from "../components/LetzplayPanel";
 import { useTable } from "../lib/useTable";
 import { supabase, supabaseConfigured } from "../lib/supabase";
 import { createAuditLog } from "../lib/actions";
@@ -41,6 +42,7 @@ const ADMIN_PIN_SHA256 =
 const TABS = [
   { id: "ops", label: "OPS" },
   { id: "conf", label: "CONF" },
+  { id: "letz", label: "LETZ" },
   { id: "class", label: "CLASS" },
   { id: "notif", label: "NOTIF" },
   { id: "audit", label: "AUDIT" },
@@ -802,6 +804,15 @@ export default function Org() {
               onGenerated={refreshMatches}
             />
           </section>
+        )}
+
+        {tab === "letz" && (
+          <LetzplayPanel
+            matches={matches}
+            lineups={lineups}
+            selectedCategories={selectedCategories}
+            onChanged={refreshOps}
+          />
         )}
 
         {tab === "class" && (

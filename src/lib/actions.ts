@@ -516,3 +516,20 @@ export async function insertGeneratedMatches(
   });
   return null;
 }
+
+// ---------------------------------------------------------------------------
+// Transferência para o LetzPlay: marca/desmarca o confronto como já digitado lá.
+// ---------------------------------------------------------------------------
+export async function setLetzplaySynced(match: Match, synced: boolean, actor = "ORG") {
+  if (!supabase) return;
+  await supabase
+    .from("matches")
+    .update({ letzplay_synced_at: synced ? now() : null, updated_at: now() })
+    .eq("id", match.id);
+  await createAuditLog({
+    actor,
+    action: synced ? "LETZPLAY_ENVIADO" : "LETZPLAY_DESFEITO",
+    entity: "matches",
+    details: matchLabel(match),
+  });
+}

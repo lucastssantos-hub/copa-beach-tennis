@@ -559,3 +559,102 @@ export function teamSide(m: Match, team: Pick<Team, "id" | "team_name">): "a" | 
   if (m.team_b_id === team.id || m.team_b_name === team.team_name) return "b";
   return null;
 }
+
+// ---------------------------------------------------------------------------
+// Transferência para o LetzPlay (digitação manual).
+// As chaves rodam no LetzPlay; o app é a fonte das escalações. Para digitar um
+// jogo lá, precisamos das DUAS duplas (uma de cada seleção). Logo, um confronto
+// só fica "pronto para o LetzPlay" quando as duas escalações foram enviadas.
+// ---------------------------------------------------------------------------
+export type LetzplayStage = "aguardando" | "pronto" | "enviado";
+
+export interface Pair {
+  p1: string;
+  p2: string;
+}
+
+export interface LineupTriple {
+  feminina: Pair | null;
+  masculina: Pair | null;
+  mista: Pair | null;
+}
+
+export interface LetzplayMatch {
+  match: Match;
+  stage: LetzplayStage;
+  /** Lados ainda sem escalação enviada (para cobrar o capitão). */
+  pendingSides: ("a" | "b")[];
+  a: LineupTriple | null;
+  b: LineupTriple | null;
+}
+
+function pair(p1: string | null, p2: string | null): Pair | null {
+  const a = (p1 || "").trim();
+  const b = (p2 || "").trim();
+  if (!a && !b) return null;
+  return { p1: a || "—", p2: b || "—" };
+}
+
+function tripleFromLineup(l: Lineup | undefined): LineupTriple | null {
+  if (!l) return null;
+  return {
+    feminina: pair(l.female_player_1, l.female_player_2),
+    masculina: pair(l.male_player_1, l.male_player_2),
+    mista: pair(l.mixed_player_1, l.mixed_player_2),
+  };
+}
+
+/** Escalação considerada confirmada para transferência (capitão já enviou). */
+function isSubmitted(l: Lineup | undefined): boolean {
+  return !!l && (l.lineup_status === "Enviada" || l.lineup_status === "Confirmada");
+}
+
+export function buildLetzplayMatch(match: Match, lineups: Lineup[]): LetzplayMatch {
+  const forMatch = lineups.filter((l) => l.match_id === match.id);
+  const pick = (side: "a" | "b") => {
+    const teamId = sideTeamId(match, side);
+    const teamName = sideTeamName(match, side);
+    return forMatch.find((l) =>
+      teamId ? l.team_id === teamId : l.team_name === teamName,
+    );
+  };
+  const la = pick("a");
+  const lb = pick("b");
+  const pendingSides: ("a" | "b")[] = [];
+  if (!isSubmitted(la)) pendingSides.push("a");
+  if (!isSubmitted(lb)) pendingSides.push("b");
+
+  const stage: LetzplayStage = match.letzplay_synced_at
+    ? "enviado"
+    : pendingSides.length === 0
+      ? "pronto"
+      : "aguardando";
+
+  return {
+    match,
+    stage,
+    pendingSides,
+    a: tripleFromLineup(la),
+    b: tripleFromLineup(lb),
+  };
+}
+
+/** Texto pronto para colar/conferir ao digitar o confronto no LetzPlay. */
+export function letzplayClipboardText(lm: LetzplayMatch): string {
+  const m = lm.match;
+  const head = `${sideTeamName(m, "a")} x ${sideTeamName(m, "b")} — Cat. ${m.category_name ?? "?"}` +
+    `${m.group_or_phase ? ` · ${m.group_or_phase}` : ""}${m.scheduled_time ? ` · ${m.scheduled_time}` : ""}`;
+  const lines = [head];
+  const block = (label: string, key: keyof LineupTriple, onlyIfMista = false) => {
+    const pa = lm.a?.[key] ?? null;
+    const pb = lm.b?.[key] ?? null;
+    if (!pa && !pb) return;
+    lines.push(label + (onlyIfMista ? " (só se 1x1)" : ""));
+    lines.push(`  ${sideTeamName(m, "a")}: ${pa ? `${pa.p1} / ${pa.p2}` : "—"}`);
+    lines.push(`  ${sideTeamName(m, "b")}: ${pb ? `${pb.p1} / ${pb.p2}` : "—"}`);
+  };
+  block("Feminino", "feminina");
+  block("Masculino", "masculina");
+  block("Mista", "mista", true);
+  return lines.join("\n");
+}

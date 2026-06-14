@@ -83,6 +83,7 @@ export interface Match {
   match_mode: string;
   mixed_required: boolean;
   contest_reason: string | null;
+  letzplay_synced_at: string | null;
   created_at: string;
   updated_at: string;
 }
