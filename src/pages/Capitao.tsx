@@ -691,7 +691,9 @@ function CaptainPanel({ team, onLogout }: { team: Team; onLogout: () => void }) 
               presence={presence}
               results={results}
               athletes={athletes.filter(
-                (a) => a.team_id === team.id || a.team_name === team.team_name,
+                (a) =>
+                  (a.team_id === team.id || a.team_name === team.team_name) &&
+                  (a.category_name === selected.category_name || !a.category_name),
               )}
               onBack={() => setSelectedId(null)}
               onChanged={refresh}

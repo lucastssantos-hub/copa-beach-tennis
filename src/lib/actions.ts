@@ -8,6 +8,7 @@ import {
   matchLabel,
   matchWinnerSide,
   needsMista,
+  normalizeOneSetScore,
   sideTeamId,
   sideTeamName,
   type GameType,
@@ -191,6 +192,46 @@ export async function saveLineup(
     entity: "lineups",
     details: `Confronto ${match.team_a_name} x ${match.team_b_name}`,
   });
+
+  // Divergência LetzPlay: se a escalação JÁ enviada foi alterada, o que já subiu
+  // ao LetzPlay (robô e/ou painel manual) ficou desatualizado. Limpa as flags
+  // para o confronto voltar à fila de sincronização e alerta o ADM.
+  if (updatingSentLineup) {
+    const resultLikeStatuses: MatchStatus[] = [
+      "Finalizado",
+      "W.O.",
+      "Desistência",
+      "Resultado contestado",
+    ];
+    const impactsResult = resultLikeStatuses.includes(match.match_status);
+    const hadSync = !!match.letzplay_synced_at || match.synced_escalacao || match.synced_resultado;
+    const flagPatch: Record<string, unknown> = {
+      letzplay_synced_at: null,
+      synced_escalacao: false,
+      updated_at: now(),
+    };
+    // synced_resultado só é zerado quando a mudança pode impactar o resultado já
+    // sincronizado (confronto em estado terminal/contestado).
+    if (impactsResult) flagPatch.synced_resultado = false;
+    await supabase.from("matches").update(flagPatch).eq("id", match.id);
+
+    if (hadSync) {
+      await createNotification({
+        notification_type: "alerta",
+        message: `⚠ ${team.team_name} alterou a escalação após sincronizar com o LetzPlay — revise ${matchLabel(match)}${impactsResult ? " (o resultado também precisa ser refeito no LetzPlay)" : ""}`,
+        team_id: team.id,
+        team_name: team.team_name,
+        match_id: match.id,
+      });
+    }
+    await createAuditLog({
+      actor: `CAPITAO:${team.team_name}`,
+      action: "INVALIDAR_SYNC_LETZPLAY",
+      entity: "matches",
+      details: `${matchLabel(match)} — flags LetzPlay limpas (escalação alterada)${impactsResult ? " + resultado" : ""}`,
+    });
+  }
+
   // Avança a máquina de status: 1 escalação enviada = parcial, 2 = recebidas.
   const { data: sent } = await supabase
     .from("lineups")
@@ -314,12 +355,14 @@ export async function recordGameResult(
   actor = "ORG",
 ) {
   if (!supabase) return;
+  const normalizedScore = normalizeOneSetScore(score);
+  if (!normalizedScore) return { error: "Placar inválido para a Copa: use 1 set, como 6-3 ou 7-6(4)." };
   const row = {
     match_id: match.id,
     game_type: gameType,
     winner_team_id: sideTeamId(match, winner),
     winner_team_name: sideTeamName(match, winner),
-    score: score.trim() || null,
+    score: normalizedScore,
     result_status: "Validado",
     submitted_by: actor,
     finished_at: now(),

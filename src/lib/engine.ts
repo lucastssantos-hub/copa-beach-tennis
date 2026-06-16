@@ -128,6 +128,91 @@ function teamKey(match: Match, side: "a" | "b"): string {
   return (side === "a" ? match.team_a_id || match.team_a_name : match.team_b_id || match.team_b_name) || "?";
 }
 
+export interface ScoreSet {
+  gw: number; // games do vencedor do confronto naquele set
+  gl: number; // games do perdedor naquele set
+  tb: number | null; // pontos do tiebreak do PERDEDOR do set, ou null
+}
+
+/**
+ * Faz o parse do placar no formato real desta Copa no LetzPlay: exatamente 1
+ * set, vencedor-perdedor, com tiebreak opcional do perdedor entre parênteses.
+ * Ex.: "6-3" · "7-6(4)".
+ * Retorna null quando não há set numérico (ex.: "W.O.", "Desist.").
+ */
+export function parseScoreSets(score: string | null | undefined): ScoreSet[] | null {
+  if (!score || /w\.?o\.?|desist/i.test(score)) return null;
+  if (score.includes(",")) return null;
+  const sets: ScoreSet[] = [];
+  const m = score.trim().match(/^(\d+)\s*[-x]\s*(\d+)(?:\s*\(\s*(\d+)\s*\))?$/i);
+  if (!m) return null;
+  const set = { gw: Number(m[1]), gl: Number(m[2]), tb: m[3] != null ? Number(m[3]) : null };
+  if (!isValidOneSetScore(set)) return null;
+  sets.push(set);
+  return sets;
+}
+
+export function isValidOneSetScore(set: ScoreSet): boolean {
+  const { gw, gl, tb } = set;
+  if (!Number.isInteger(gw) || !Number.isInteger(gl)) return false;
+  if (gw === gl) return false;
+  if (gw > 7 || gl > 6 || gw < 0 || gl < 0) return false;
+  if (tb != null && (!Number.isInteger(tb) || tb < 0 || tb > 99)) return false;
+  if (gw === 7 && gl === 6) return tb != null;
+  if (tb != null) return false;
+  if (gw === 7) return gl === 5;
+  if (gw === 6) return gl >= 0 && gl <= 4;
+  return false;
+}
+
+export function oneSetScoreHelpText(): string {
+  return "LetzPlay configurado para 1 Set / 6 Games com tiebreak no 6 a 6. Informe sempre vencedor-perdedor: 6-3 ou 7-6(4).";
+}
+
+export function oneSetScoreErrorText(): string {
+  return "Placar inválido. LetzPlay configurado para 1 Set / 6 Games com tiebreak no 6 a 6. Use 6-3 ou 7-6(4).";
+}
+
+export function oneSetScoreInputPlaceholder(): string {
+  return "6-3 ou 7-6(4)";
+}
+
+export function oneSetScoreExamples(): string {
+  return "Multi-set não é aceito, por exemplo: 6-4, 7-6(4).";
+}
+
+export function parseOneSetScore(score: string | null | undefined): ScoreSet | null {
+  const sets = parseScoreSets(score);
+  return sets?.[0] ?? null;
+}
+
+export function normalizeOneSetScore(score: string): string | null {
+  const set = parseOneSetScore(score);
+  if (!set) return null;
+  return `${set.gw}-${set.gl}${set.tb != null ? `(${set.tb})` : ""}`;
+}
+
+export function scoreHasMultipleSets(score: string): boolean {
+  return score.includes(",");
+}
+
+export function scoreIsTieWithoutTiebreak(score: string): boolean {
+  const m = score.trim().match(/^(\d+)\s*[-x]\s*(\d+)$/i);
+  return !!m && Number(m[1]) === Number(m[2]);
+}
+
+export function scoreSaldoGames(score: string | null | undefined): { gw: number; gl: number } | null {
+  const set = parseOneSetScore(score);
+  if (!set) return null;
+  return { gw: set.gw, gl: set.gl };
+}
+
+export function sumScoreSets(score: string | null | undefined): { gw: number; gl: number } | null {
+  const saldo = scoreSaldoGames(score);
+  if (!saldo) return null;
+  return saldo;
+}
+
 export function computeStandings(matches: Match[], results: Result[]): StandingRow[] {
   const table = new Map<string, StandingRow>();
   const h2h = new Map<string, number>(); // `${winner}|${loser}` → confrontos vencidos no duelo
@@ -171,8 +256,11 @@ export function computeStandings(matches: Match[], results: Result[]): StandingR
         const winner = w === "a" ? a : b;
         const loser = w === "a" ? b : a;
         winner.sv++;
-        const [gw, gl] = (r.score || "").split("-").map((n) => parseInt(n, 10));
-        if (!Number.isFinite(gw) || !Number.isFinite(gl)) return; // "W.O." etc.
+        const sets = parseScoreSets(r.score);
+        if (!sets) return; // "W.O." / "Desist." — sem games numéricos no saldo
+        // A Copa está configurada no LetzPlay como 1 set. O tiebreak não conta
+        // como game; o saldo vem apenas do único set aceito pelo app.
+        const { gw, gl } = sets[0];
         winner.gp += gw; winner.gc += gl;
         loser.gp += gl; loser.gc += gw;
       });

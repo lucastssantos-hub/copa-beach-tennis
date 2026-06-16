@@ -21,6 +21,12 @@ import {
   courtLabel,
   isCourtFree,
   needsMista,
+  normalizeOneSetScore,
+  oneSetScoreErrorText,
+  oneSetScoreExamples,
+  oneSetScoreHelpText,
+  oneSetScoreInputPlaceholder,
+  parseScoreSets,
   resultsFor,
   sideLineup,
   sidePresence,
@@ -253,22 +259,36 @@ function GameResultForm({
 
   async function save() {
     if (!winner) return;
-    const cleanScore = score.trim();
-    const parsed = cleanScore.match(/^(\d{1,2})\s*-\s*(\d{1,2})$/);
-    if (!parsed) {
-      setError("Informe o placar no formato 6-3.");
+    // Formato real desta Copa no LetzPlay: 1 set, vencedor-perdedor, tiebreak
+    // opcional do perdedor apenas no 7-6. Ex.: "6-3" · "7-6(4)".
+    const sets = parseScoreSets(score.trim());
+    if (!sets) {
+      setError(oneSetScoreErrorText());
       return;
     }
-    const winnerGames = Number(parsed[1]);
-    const loserGames = Number(parsed[2]);
-    if (winnerGames <= loserGames) {
-      setError("Use a convenção vencedor-perdedor. O primeiro número precisa ser maior.");
+    for (const s of sets) {
+      if (s.gw === s.gl) {
+        setError("Um set não pode terminar empatado (ex.: 6-6).");
+        return;
+      }
+      if (s.gw > 9 || s.gl > 9) {
+        setError("Games de um set fora do intervalo esperado (0–9).");
+        return;
+      }
+    }
+    const normalized = normalizeOneSetScore(score.trim());
+    if (!normalized) {
+      setError(oneSetScoreErrorText());
       return;
     }
     setError(null);
     setBusy(true);
-    await recordGameResult(match, results, gameType, winner, `${winnerGames}-${loserGames}`);
+    const saved = await recordGameResult(match, results, gameType, winner, normalized);
     setBusy(false);
+    if (saved && "error" in saved && saved.error) {
+      setError(saved.error);
+      return;
+    }
     onChanged();
   }
 
@@ -306,10 +326,10 @@ function GameResultForm({
       <div className="flex items-end gap-2">
         <div className="flex-1">
           <FormInput
-            label="Placar (vencedor-perdedor)"
+            label="Placar (formato LetzPlay)"
             value={score}
             onChange={(e) => setScore(e.target.value)}
-            placeholder="6-3"
+            placeholder={oneSetScoreInputPlaceholder()}
             disabled={disabled}
           />
         </div>
@@ -317,6 +337,11 @@ function GameResultForm({
           {busy ? "…" : "Salvar"}
         </Button>
       </div>
+      {/* Mesmo formato real do LetzPlay nesta Copa: vencedor-perdedor em 1 set;
+          tiebreak do perdedor entre parênteses. */}
+      <p className="text-[10px] font-semibold text-cream/40">
+        {oneSetScoreHelpText()} {oneSetScoreExamples()}
+      </p>
       {error && <p className="text-xs font-bold text-coral">{error}</p>}
     </div>
   );
@@ -436,6 +461,30 @@ function WalkoverBlock({ match, results, onChanged }: { match: Match; results: R
   );
 }
 
+// ---------------- Status LetzPlay (somente leitura) ----------------
+// Mostra, por confronto, o que já foi transferido ao LetzPlay: as duas flags do
+// robô (synced_escalacao / synced_resultado) e o marcador do painel manual
+// (letzplay_synced_at). Ajuda o ADM a não digitar o mesmo confronto duas vezes.
+function LetzplayStatusRow({ match }: { match: Match }) {
+  const badge = (on: boolean, label: string) => (
+    <span
+      className={`rounded-md px-1.5 py-0.5 ${
+        on ? "bg-emerald-500/15 text-emerald-300" : "bg-white/5 text-cream/40"
+      }`}
+    >
+      {on ? "✓" : "○"} {label}
+    </span>
+  );
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide">
+      <span className="text-cream/40">LetzPlay</span>
+      {badge(!!match.synced_escalacao, "escalação")}
+      {badge(!!match.synced_resultado, "resultado")}
+      {badge(!!match.letzplay_synced_at, "manual")}
+    </div>
+  );
+}
+
 // ---------------- Painel ----------------
 export default function MatchDetail({ match, courts, lineups, presence, results, onChanged }: MatchDetailProps) {
   const status = match.match_status;
@@ -464,6 +513,8 @@ export default function MatchDetail({ match, courts, lineups, presence, results,
         </p>
         <StatusPill status={status} />
       </div>
+
+      <LetzplayStatusRow match={match} />
 
       <AdminEditBlock match={match} onChanged={onChanged} />
 

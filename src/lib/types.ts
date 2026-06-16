@@ -17,6 +17,7 @@ export interface Athlete {
   team_name: string | null;
   athlete_name: string;
   gender: "Feminino" | "Masculino";
+  category_name: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -84,6 +85,11 @@ export interface Match {
   mixed_required: boolean;
   contest_reason: string | null;
   letzplay_synced_at: string | null;
+  // Flags da automação letzplay-sync (robô Playwright). Independentes do painel
+  // manual da aba LETZ, que usa letzplay_synced_at. Coluna com default false no
+  // banco (migração 20260614150000_letzplay_sync_flags.sql).
+  synced_escalacao: boolean;
+  synced_resultado: boolean;
   created_at: string;
   updated_at: string;
 }
