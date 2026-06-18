@@ -10,6 +10,7 @@ import Button from "../components/Button";
 import FormInput, { FormSelect } from "../components/FormInput";
 import GroupGenerator from "../components/GroupGenerator";
 import KnockoutGenerator from "../components/KnockoutGenerator";
+import KnockoutBracketPreview from "../components/KnockoutBracketPreview";
 import StandingsTable from "../components/StandingsTable";
 import LetzplayPanel from "../components/LetzplayPanel";
 import { useTable } from "../lib/useTable";
@@ -820,6 +821,7 @@ export default function Org() {
             <h2 className="text-lg font-extrabold text-branco-quente">
               Classificação{classCategory ? ` — Cat. ${classCategory}` : ""}
             </h2>
+            <KnockoutBracketPreview categoryName={classCategory} />
             {classGroups.length === 0 ? (
               <EmptyState
                 icon="📊"

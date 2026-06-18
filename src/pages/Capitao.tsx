@@ -5,6 +5,7 @@ import CategoryChips from "../components/CategoryChips";
 import EmptyState from "../components/EmptyState";
 import Button from "../components/Button";
 import FormInput, { FormSelect } from "../components/FormInput";
+import KnockoutBracketPreview from "../components/KnockoutBracketPreview";
 import StatusPill from "../components/StatusPill";
 import { useTable } from "../lib/useTable";
 import { supabase, supabaseConfigured } from "../lib/supabase";
@@ -751,6 +752,8 @@ function CaptainPanel({ team, onLogout }: { team: Team; onLogout: () => void }) 
           <CategoryChips categories={categories} selected={category} onSelect={setCategory} allLabel="Todas" />
         </div>
       )}
+
+      <KnockoutBracketPreview categoryName={category ?? (categories.includes("60+") ? "60+" : null)} />
 
       <section className="space-y-3">
         <h2 className="text-sm font-extrabold uppercase tracking-[0.18em] text-cream/70">
