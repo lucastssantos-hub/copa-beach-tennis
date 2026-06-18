@@ -80,8 +80,8 @@ export const ATHLETES_BY_TEAM_CAT = {
       men: [{"id": "aus-35plus-m1", "name": "Guilherme Dolci", "categories": ["35+"]}, {"id": "aus-35plus-m2", "name": "Rafael Pereira", "categories": ["35+"]}],
     },
     "60+": {
-      women: [{"id": "aus-60plus-w1", "name": "Alessandra Gauza", "categories": ["60+"]}, {"id": "aus-60plus-w2", "name": "Marina Dolci", "categories": ["60+"]}],
-      men: [{"id": "aus-60plus-m1", "name": "Jaqueline Kohut", "categories": ["60+"]}, {"id": "aus-60plus-m2", "name": "José Fernando Mello", "categories": ["60+"]}, {"id": "aus-60plus-m3", "name": "Mattheus Salvadori", "categories": ["60+"]}],
+      women: [{"id": "aus-60plus-w1", "name": "Alessandra Gauza", "categories": ["60+"]}, {"id": "aus-60plus-w2", "name": "Marina Dolci", "categories": ["60+"]}, {"id": "aus-60plus-w3", "name": "Jaqueline Kohut", "categories": ["60+"]}],
+      men: [{"id": "aus-60plus-m1", "name": "José Fernando Mello", "categories": ["60+"]}, {"id": "aus-60plus-m2", "name": "Mattheus Salvadori", "categories": ["60+"]}],
     },
     "A": {
       women: [{"id": "aus-a-w1", "name": "Marina Dolci", "categories": ["A"]}, {"id": "aus-a-w2", "name": "Rafaela Cesco", "categories": ["A"]}],
