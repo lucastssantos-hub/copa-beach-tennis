@@ -67,7 +67,7 @@ export function CaptainMatch({ match, onBack, dispatch, toast, me }) {
   }
   function doSubmitResult() {
     dispatch(submitResult(match, { actor: "capitao" }));
-    toast("Resultado enviado para validação da Organização");
+    toast("Resultado finalizado");
     onBack();
   }
 

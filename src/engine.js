@@ -77,7 +77,7 @@ export const WARMUP_MS = 6 * 60 * 1000;
 
 const TERMINAL = new Set([STATUS.FINALIZADO, STATUS.WO, STATUS.DESISTENCIA]);
 const LOCKED = new Set([
-  STATUS.AQUECIMENTO, STATUS.EM_JOGO, STATUS.AGUARDANDO_RESULTADO,
+  STATUS.EM_JOGO, STATUS.AGUARDANDO_RESULTADO,
   STATUS.RESULTADO_CONTESTADO, STATUS.FINALIZADO, STATUS.WO, STATUS.DESISTENCIA,
 ]);
 
@@ -105,9 +105,7 @@ function lineupStatuses(match) {
 
 export function deriveStatusFromLineups(match) {
   const ls = lineupStatuses(match);
-  // Quando ambas as equipes enviaram (ou validadas), vai direto para AGUARDANDO_QUADRA
-  // sem passar por AGUARDANDO_VALIDACAO — validação de escalação é automática.
-  if (ls.length && ls.every(s => s === "enviada" || s === "validada")) return STATUS.AGUARDANDO_QUADRA;
+  if (ls.length && ls.every(s => s === "enviada" || s === "validada")) return STATUS.EM_JOGO;
   if (ls.some(s => s === "enviada" || s === "validada")) return STATUS.ESCALACAO_ENVIADA;
   return STATUS.AGUARDANDO_ESCALACAO;
 }
@@ -282,16 +280,16 @@ export function recordGame(match, gameKey, result, { actor = "arbitro" } = {}) {
   return tx(next, [makeAudit({ actor, action: "Placar registrado", matchId: match.id, detail: `${gameKey} ${result.score}` })]);
 }
 
-// Árbitro/Capitão envia o resultado final do confronto para validação
-export function submitResult(match, { actor = "arbitro" } = {}) {
+// Capitão envia o resultado → FINALIZADO direto (sem validação manual)
+export function submitResult(match, { actor = "capitao" } = {}) {
   const next = {
     ...match,
-    status: STATUS.AGUARDANDO_RESULTADO,
-    result: { ...match.result, submittedBy: actor, submittedAt: Date.now(), contested: false, reason: null },
+    status: STATUS.FINALIZADO,
+    result: { ...match.result, submittedBy: actor, submittedAt: Date.now(), validated: true, contested: false, reason: null },
   };
   return tx(next,
-    [makeAudit({ actor, action: "Resultado lançado", matchId: match.id })],
-    [makeNotification({ type: "info", text: `Resultado lançado — ${match.id} · aguardando validação`, audience: "admin" })]);
+    [makeAudit({ actor, action: "Resultado finalizado", matchId: match.id })],
+    [makeNotification({ type: "done", text: `Resultado finalizado — ${match.id}`, audience: "all" })]);
 }
 
 // ADM valida o resultado → FINALIZADO (atualiza classificação)
