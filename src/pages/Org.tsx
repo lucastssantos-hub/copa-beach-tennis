@@ -759,6 +759,7 @@ export default function Org() {
                             <div key={m.id} className="space-y-3">
                               <MatchReadinessCard
                                 match={m}
+                                courts={courts}
                                 lineups={lineups}
                                 presence={presence}
                                 results={results}

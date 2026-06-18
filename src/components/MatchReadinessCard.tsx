@@ -13,13 +13,14 @@ import {
   sidePresence,
   sideTeamName,
 } from "../lib/engine";
-import { confirmPresenceAndAdvance, pokeCaptain, startMatch } from "../lib/actions";
-import type { Lineup, Match, Presence, Result } from "../lib/types";
+import { confirmPresenceAndAdvance, pokeCaptain, startMatch, updateMatchAdmin } from "../lib/actions";
+import type { Court, Lineup, Match, Presence, Result } from "../lib/types";
 
 type Side = "a" | "b";
 
 interface MatchReadinessCardProps {
   match: Match;
+  courts: Court[];
   lineups: Lineup[];
   presence: Presence[];
   results: Result[];
@@ -119,6 +120,7 @@ function SideStatus({
 
 export default function MatchReadinessCard({
   match,
+  courts,
   lineups,
   presence,
   results,
@@ -129,8 +131,14 @@ export default function MatchReadinessCard({
 }: MatchReadinessCardProps) {
   const [busy, setBusy] = useState<string | null>(null);
   const [poked, setPoked] = useState<Side[]>([]);
+  const [courtError, setCourtError] = useState<string | null>(null);
   const mix = mixedState(match, results);
   const status = match.match_status;
+  const courtOptions = courts
+    .map((court) => `Q${court.court_number}`)
+    .sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
+  const selectedCourt = match.court ?? "";
+  const hasStoredCourt = selectedCourt && !courtOptions.includes(selectedCourt);
 
   async function confirm(side: Side) {
     setBusy(`pres-${side}`);
@@ -151,6 +159,18 @@ export default function MatchReadinessCard({
     setBusy("start");
     await startMatch(match);
     setBusy(null);
+    onChanged();
+  }
+
+  async function changeCourt(court: string) {
+    setBusy("court");
+    setCourtError(null);
+    const error = await updateMatchAdmin(match, { court: court || null });
+    setBusy(null);
+    if (error) {
+      setCourtError(error);
+      return;
+    }
     onChanged();
   }
 
@@ -194,6 +214,30 @@ export default function MatchReadinessCard({
         </span>
         <StatusPill status={status} />
       </div>
+
+      <label
+        className="grid grid-cols-[auto_1fr] items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span className="text-[10px] font-extrabold uppercase tracking-widest text-cream/50">
+          Quadra
+        </span>
+        <select
+          value={selectedCourt}
+          disabled={busy !== null}
+          onChange={(e) => changeCourt(e.target.value)}
+          className="min-w-0 rounded-xl border border-coral/40 bg-roxo-escuro px-3 py-2 text-sm font-extrabold text-branco-quente outline-none transition focus:border-coral"
+        >
+          <option value="">Definir</option>
+          {hasStoredCourt && <option value={selectedCourt}>{selectedCourt}</option>}
+          {courtOptions.map((court) => (
+            <option key={court} value={court}>
+              {court}
+            </option>
+          ))}
+        </select>
+      </label>
+      {courtError && <p className="text-[10px] font-bold text-coral">{courtError}</p>}
 
       <div className="flex items-center justify-between gap-3">
         <span className="min-w-0 flex-1 truncate text-base font-extrabold text-branco-quente">
