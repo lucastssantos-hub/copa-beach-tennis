@@ -173,8 +173,8 @@ export const ATHLETES_BY_TEAM_CAT = {
       men: [{"id": "fra-35plus-m1", "name": "Henrique Leuterio", "categories": ["35+"]}],
     },
     "60+": {
-      women: [],
-      men: [{"id": "fra-60plus-m1", "name": "Henrique Leuterio", "categories": ["60+"]}],
+      women: [{"id": "fra-60plus-w1", "name": "Gabriela Pedroso", "categories": ["60+"]}, {"id": "fra-60plus-w2", "name": "Bruna Déborah Napoli Pereira Brina", "categories": ["60+"]}],
+      men: [{"id": "fra-60plus-m1", "name": "Henrique Leuterio", "categories": ["60+"]}, {"id": "fra-60plus-m2", "name": "Thiago Felisberto", "categories": ["60+"]}],
     },
     "A": {
       women: [],
