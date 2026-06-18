@@ -1,6 +1,6 @@
 // ============ Captain — Match detail / Escalação / Contestação ============
 import { useState } from "react";
-import { TEAMS, athleteName, confrontoScore, teamName } from "./data.js";
+import { TEAMS, athleteName, confrontoScore, teamName, getAthletesByCategory } from "./data.js";
 import { STATUS, isTerminal, needsMista, saveDraftLineup, submitLineup, submitMista, contestResult } from "./engine.js";
 import { AppBar, Card, StatusPill, Eyebrow, Button, Flag } from "./components.jsx";
 import { DuoPicker } from "./captainHome.jsx";
@@ -10,6 +10,8 @@ export function CaptainMatch({ match, onBack, dispatch, toast, me }) {
   const lineup = match.lineups[me];
   const editable = lineup.status === "pendente" || lineup.status === "rascunho";
   const team = TEAMS[me] || { name: me, flag: "", women: [], men: [] };
+  // Atletas filtrados pela categoria deste confronto específico
+  const catAthletes = getAthletesByCategory(me, match.category);
 
   const [fem, setFem] = useState(lineup.fem);
   const [masc, setMasc] = useState(lineup.masc);
@@ -72,12 +74,12 @@ export function CaptainMatch({ match, onBack, dispatch, toast, me }) {
             <div style={{ marginBottom: 8 }}>
               <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: "#FF8478", letterSpacing: ".08em" }}>JOGO 1</span>
             </div>
-            <DuoPicker label="Dupla Feminina" gender="f" pool={team.women} selected={fem} onPick={id => pickInto(fem, setFem, id)} />
+            <DuoPicker label="Dupla Feminina" gender="f" pool={catAthletes.women} selected={fem} onPick={id => pickInto(fem, setFem, id)} />
 
             <div style={{ marginBottom: 8 }}>
               <span style={{ fontFamily: "'JetBrains Mono',monospace", fontSize: 11, color: "#9B6BFF", letterSpacing: ".08em" }}>JOGO 2</span>
             </div>
-            <DuoPicker label="Dupla Masculina" gender="m" pool={team.men} selected={masc} onPick={id => pickInto(masc, setMasc, id)} />
+            <DuoPicker label="Dupla Masculina" gender="m" pool={catAthletes.men} selected={masc} onPick={id => pickInto(masc, setMasc, id)} />
           </div>
 
           {!complete && (
@@ -125,9 +127,9 @@ export function CaptainMatch({ match, onBack, dispatch, toast, me }) {
                     <div style={{ fontSize: 12.5, color: "#FF8478", marginBottom: 14, fontWeight: 600 }}>
                       Confronto empatado 1×1 — escale sua dupla mista.
                     </div>
-                    <DuoPicker label="Atleta feminina" gender="f" pool={team.women}
+                    <DuoPicker label="Atleta feminina" gender="f" pool={catAthletes.women}
                       selected={[mistaW]} onPick={id => setMistaW(mistaW === id ? null : id)} />
-                    <DuoPicker label="Atleta masculino" gender="m" pool={team.men}
+                    <DuoPicker label="Atleta masculino" gender="m" pool={catAthletes.men}
                       selected={[mistaM]} onPick={id => setMistaM(mistaM === id ? null : id)} />
                     <Button full disabled={!mistaW || !mistaM} onClick={sendMista}>Enviar dupla mista</Button>
                   </>

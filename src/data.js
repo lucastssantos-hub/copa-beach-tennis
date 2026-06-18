@@ -1,5 +1,6 @@
 // ============ Copa do Mundo de Beach Tennis — tournament data ============
 import { STATUS, STATUS_FLOW_META, normalizeMatch, WARMUP_MS } from "./engine.js";
+import { ATHLETES_BY_TEAM_CAT } from "./athletes.js";
 
 export const FLAGS = {
   ARG: "🇦🇷", ARU: "🇦🇼", AUS: "🇦🇺", BRA: "🇧🇷", CAN: "🇨🇦",
@@ -36,20 +37,21 @@ const CAPTAIN_NAMES = {
 };
 
 function makeRoster(code) {
-  const initials = code.toLowerCase();
-  const names = {
-    BRA: { women: ["Sofia Almeida", "Marina Costa", "Júlia Ferraz"], men: ["Diego Ramos", "Lucas Mendes", "Rafael Pinto"] },
-    ITA: { women: ["Giulia Conti", "Sara Greco"], men: ["Marco Bruno", "Luca Ferri"] },
-  }[code];
-  const women = names?.women || [`${COUNTRY_NAMES[code]} F1`, `${COUNTRY_NAMES[code]} F2`];
-  const men   = names?.men   || [`${COUNTRY_NAMES[code]} M1`, `${COUNTRY_NAMES[code]} M2`];
+  // Agrega todos os atletas do país em todas as categorias (lista global da equipe)
+  const byTeam = ATHLETES_BY_TEAM_CAT[code] || {};
+  const womenMap = new Map();
+  const menMap = new Map();
+  Object.values(byTeam).forEach(({ women = [], men = [] }) => {
+    women.forEach(a => { if (!womenMap.has(a.id)) womenMap.set(a.id, a); });
+    men.forEach(a => { if (!menMap.has(a.id)) menMap.set(a.id, a); });
+  });
   return {
     id: code,
     name: COUNTRY_NAMES[code],
     flag: FLAGS[code],
     captain: CAPTAIN_NAMES[code] || null,
-    women: women.map((name, i) => ({ id: `${initials}-w${i + 1}`, name })),
-    men:   men.map((name, i)   => ({ id: `${initials}-m${i + 1}`, name })),
+    women: [...womenMap.values()],
+    men:   [...menMap.values()],
   };
 }
 
@@ -57,6 +59,17 @@ export const TEAMS = Object.keys(COUNTRY_NAMES).reduce((acc, code) => {
   acc[code] = makeRoster(code);
   return acc;
 }, {});
+
+// Retorna atletas de uma equipe filtrados pela categoria do confronto
+export function getAthletesByCategory(code, categoryId) {
+  const byTeam = ATHLETES_BY_TEAM_CAT[code] || {};
+  const catData = byTeam[categoryId] || { women: [], men: [] };
+  // Fallback: se não houver atletas na categoria, retorna lista global
+  if (catData.women.length === 0 && catData.men.length === 0) {
+    return { women: TEAMS[code]?.women || [], men: TEAMS[code]?.men || [] };
+  }
+  return { women: catData.women, men: catData.men };
+}
 
 export const EVENT = {
   title: "Copa do Mundo de Beach Tennis",
