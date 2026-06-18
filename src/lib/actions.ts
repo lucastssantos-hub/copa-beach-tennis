@@ -232,14 +232,28 @@ export async function saveLineup(
     });
   }
 
-  // Avança a máquina de status: 1 escalação enviada = parcial, 2 = recebidas.
+  // Avança a máquina de status sem exigir validação manual da organização:
+  // 1 escalação enviada = parcial; 2 escalações + quadra definida = liberado.
   const { data: sent } = await supabase
     .from("lineups")
     .select("team_id, team_name")
     .eq("match_id", match.id)
     .eq("lineup_status", "Enviada");
   const distinctTeams = new Set((sent ?? []).map((l) => l.team_id || l.team_name)).size;
-  await advanceMatchStatus(match, distinctTeams >= 2 ? "Escalações recebidas" : "Escalação parcial");
+  const nextStatus =
+    distinctTeams >= 2
+      ? match.court
+        ? "Liberado para quadra"
+        : "Escalações recebidas"
+      : "Escalação parcial";
+  await advanceMatchStatus(match, nextStatus);
+  if (distinctTeams >= 2 && match.court) {
+    await createNotification({
+      notification_type: "quadra",
+      message: `${matchLabel(match)} com escalações completas — quadra ${match.court}`,
+      match_id: match.id,
+    });
+  }
   return null;
 }
 

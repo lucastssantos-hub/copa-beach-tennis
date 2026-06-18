@@ -1,7 +1,7 @@
 // ============================================================================
 // MatchReadinessCard — cartão operacional de prontidão (formato Lovable).
-// Mostra num relance: status, placar, escalação/presença por equipe (com ações
-// inline de confirmar presença e cobrar capitão), estado da mista e a ação
+// Mostra num relance: status, placar, escalação por equipe (com ação
+// inline de cobrar capitão), quadra, estado da mista e a ação
 // principal contextual do confronto.
 // ============================================================================
 import { useState } from "react";
@@ -10,11 +10,10 @@ import {
   MIXED_LABEL,
   mixedState,
   sideLineup,
-  sidePresence,
   sideTeamName,
 } from "../lib/engine";
-import { confirmPresenceAndAdvance, pokeCaptain, startMatch, updateMatchAdmin } from "../lib/actions";
-import type { Court, Lineup, Match, Presence, Result } from "../lib/types";
+import { pokeCaptain, startMatch, updateMatchAdmin } from "../lib/actions";
+import type { Court, Lineup, Match, Result } from "../lib/types";
 
 type Side = "a" | "b";
 
@@ -22,7 +21,6 @@ interface MatchReadinessCardProps {
   match: Match;
   courts: Court[];
   lineups: Lineup[];
-  presence: Presence[];
   results: Result[];
   selected: boolean;
   /** Alterna o painel de detalhe (toque no cartão). */
@@ -48,27 +46,21 @@ function SideStatus({
   match,
   side,
   lineups,
-  presence,
   busy,
-  onConfirm,
   onPoke,
 }: {
   match: Match;
   side: Side;
   lineups: Lineup[];
-  presence: Presence[];
   busy: string | null;
-  onConfirm: (side: Side) => void;
   onPoke: (side: Side) => void;
 }) {
   const lineup = sideLineup(match, lineups, side);
   const lineupSent = lineup?.lineup_status === "Enviada";
-  const p = sidePresence(match, presence, side);
   const flag = side === "a" ? match.team_a_flag : match.team_b_flag;
   const abbr =
     (side === "a" ? match.team_a_abbreviation : match.team_b_abbreviation) ||
     sideTeamName(match, side);
-  const confirmed = !!p?.admin_confirmed;
 
   return (
     <div className="space-y-1.5 rounded-xl border border-white/10 bg-white/[0.03] p-2">
@@ -76,30 +68,11 @@ function SideStatus({
         <span className="text-sm">
           {flag} <span className="font-mono text-xs font-bold text-branco-quente">{abbr}</span>
         </span>
-        {p?.captain_ready && !confirmed && (
-          <span className="text-[9px] font-extrabold uppercase tracking-wider text-amber-300" title="Capitão avisou: pronto na arena">
-            ● Ready
-          </span>
-        )}
       </div>
       <div className="flex items-center gap-1">
         <Chip ok={lineupSent} label="Esc." />
-        <Chip ok={confirmed} label="Pres." />
       </div>
       <div className="flex items-center gap-1">
-        {!confirmed && (
-          <button
-            type="button"
-            disabled={busy !== null}
-            onClick={(e) => {
-              e.stopPropagation();
-              onConfirm(side);
-            }}
-            className="rounded-md border border-white/15 px-2 py-1 text-[10px] font-bold text-cream/80 transition active:scale-95"
-          >
-            {busy === `pres-${side}` ? "…" : "Confirmar"}
-          </button>
-        )}
         {!lineupSent && (
           <button
             type="button"
@@ -122,7 +95,6 @@ export default function MatchReadinessCard({
   match,
   courts,
   lineups,
-  presence,
   results,
   selected,
   onOpen,
@@ -139,14 +111,9 @@ export default function MatchReadinessCard({
     .sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
   const selectedCourt = match.court ?? "";
   const hasStoredCourt = selectedCourt && !courtOptions.includes(selectedCourt);
-
-  async function confirm(side: Side) {
-    setBusy(`pres-${side}`);
-    const other = sidePresence(match, presence, side === "a" ? "b" : "a");
-    await confirmPresenceAndAdvance(match, side, !!other?.admin_confirmed);
-    setBusy(null);
-    onChanged();
-  }
+  const bothLineupsSent =
+    sideLineup(match, lineups, "a")?.lineup_status === "Enviada" &&
+    sideLineup(match, lineups, "b")?.lineup_status === "Enviada";
 
   async function poke(side: Side) {
     setBusy(`poke-${side}`);
@@ -165,7 +132,15 @@ export default function MatchReadinessCard({
   async function changeCourt(court: string) {
     setBusy("court");
     setCourtError(null);
-    const error = await updateMatchAdmin(match, { court: court || null });
+    const nextCourt = court || null;
+    const shouldRelease =
+      !!nextCourt &&
+      bothLineupsSent &&
+      ["Escalações recebidas", "Aguardando presença", "Pronto para quadra"].includes(match.match_status);
+    const error = await updateMatchAdmin(match, {
+      court: nextCourt,
+      ...(shouldRelease ? { match_status: "Liberado para quadra" as const } : {}),
+    });
     setBusy(null);
     if (error) {
       setCourtError(error);
@@ -260,9 +235,7 @@ export default function MatchReadinessCard({
             match={match}
             side={side}
             lineups={lineups}
-            presence={presence}
             busy={busy}
-            onConfirm={confirm}
             onPoke={poke}
           />
         ))}

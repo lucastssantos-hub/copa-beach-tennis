@@ -761,7 +761,6 @@ export default function Org() {
                                 match={m}
                                 courts={courts}
                                 lineups={lineups}
-                                presence={presence}
                                 results={results}
                                 selected={m.id === selectedId}
                                 onOpen={() => setSelectedId(m.id === selectedId ? null : m.id)}

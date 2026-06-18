@@ -9,12 +9,8 @@ import StatusPill from "../components/StatusPill";
 import { useTable } from "../lib/useTable";
 import { supabase, supabaseConfigured } from "../lib/supabase";
 import {
-  advanceMatchStatus,
   contestResult,
-  createAuditLog,
-  createNotification,
   saveLineup,
-  upsertPresence,
   type LineupPlayers,
 } from "../lib/actions";
 import {
@@ -22,7 +18,6 @@ import {
   needsMista,
   resultsFor,
   sideLineup,
-  sidePresence,
   sideTeamName,
   teamSide,
   winnerSide,
@@ -295,7 +290,6 @@ function CaptainMatchView({
 }) {
   const side = teamSide(match, team);
   const myLineup = side ? sideLineup(match, lineups, side) : null;
-  const myPresence = side ? sidePresence(match, presence, side) : null;
   const submitted = myLineup?.lineup_status === "Enviada";
   const games = resultsFor(match, results);
   const mistaNeeded = needsMista(match, results);
@@ -363,39 +357,6 @@ function CaptainMatchView({
       return;
     }
     setFeedback("Rascunho salvo.");
-  }
-
-  async function imReady() {
-    if (!supabase || !side) return;
-    setBusy("ready");
-    setError(null);
-    await upsertPresence(match, side, { captain_ready: true });
-    // Os dois capitães prontos → confronto entra em "Aguardando presença" (confirmação do ADM).
-    const { data: rows } = await supabase
-      .from("presence")
-      .select("team_id, team_name, captain_ready")
-      .eq("match_id", match.id);
-    const ready = ((rows ?? []) as Pick<Presence, "team_id" | "team_name" | "captain_ready">[]).filter(
-      (p) => p.captain_ready,
-    );
-    if (new Set(ready.map((p) => p.team_id || p.team_name)).size >= 2) {
-      await advanceMatchStatus(match, "Aguardando presença");
-    }
-    await createNotification({
-      notification_type: "presenca",
-      message: `${team.team_name} informou que está pronta na arena`,
-      team_id: team.id,
-      team_name: team.team_name,
-      match_id: match.id,
-    });
-    await createAuditLog({
-      actor: `CAPITAO:${team.team_name}`,
-      action: "EQUIPE_PRONTA",
-      entity: "presence",
-      details: `Confronto ${match.team_a_name} x ${match.team_b_name}`,
-    });
-    setBusy(null);
-    onChanged();
   }
 
   async function sendContest() {
@@ -472,25 +433,28 @@ function CaptainMatchView({
         </div>
       </div>
 
-      {/* Pós-envio: confirmação + estou pronto */}
+      {/* Pós-envio: quadra definida sem validação manual da organização */}
       {locked && !terminal && !contested && (
         <div className="space-y-3 rounded-3xl border border-emerald-400/30 bg-emerald-400/5 p-4">
           <div>
             <p className="text-sm font-extrabold text-emerald-300">✓ Escalação enviada com sucesso</p>
-            <p className="text-xs font-semibold text-cream/60">Aguarde confirmação da organização.</p>
+            {match.court ? (
+              <p className="text-xs font-semibold text-cream/60">
+                Sua quadra já está definida. Acompanhe a chamada da organização.
+              </p>
+            ) : (
+              <p className="text-xs font-semibold text-amber-300">
+                Quadra ainda não definida. Assim que a organização escolher, ela aparece aqui.
+              </p>
+            )}
           </div>
-          {myPresence?.admin_confirmed ? (
-            <p className="text-center text-xs font-bold text-emerald-300">
-              ✓ Presença confirmada pela organização
-            </p>
-          ) : myPresence?.captain_ready ? (
-            <p className="text-center text-xs font-bold text-amber-300">
-              ● Organização avisada — aguardando confirmação presencial
-            </p>
-          ) : (
-            <Button full disabled={busy !== null} onClick={imReady}>
-              {busy === "ready" ? "Registrando…" : "✋ Estou pronto na arena"}
-            </Button>
+          {match.court && (
+            <div className="rounded-2xl border border-emerald-400/30 bg-emerald-400/10 px-4 py-3 text-center">
+              <p className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-200">
+                Quadra do jogo
+              </p>
+              <p className="font-display text-4xl text-branco-quente">{match.court}</p>
+            </div>
           )}
         </div>
       )}
