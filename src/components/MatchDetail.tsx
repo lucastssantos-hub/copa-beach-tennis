@@ -34,7 +34,8 @@ import {
   winnerSide,
   type GameType,
 } from "../lib/engine";
-import { MATCH_STATUSES, type Court, type Lineup, type Match, type MatchStatus, type Presence, type Result } from "../lib/types";
+import { MATCH_STATUSES, type Athlete, type Court, type Lineup, type Match, type MatchStatus, type Presence, type Result, type Team } from "../lib/types";
+import { saveLineup } from "../lib/actions";
 
 interface MatchDetailProps {
   match: Match;
@@ -42,6 +43,7 @@ interface MatchDetailProps {
   lineups: Lineup[];
   presence: Presence[];
   results: Result[];
+  athletes?: Athlete[];
   onChanged: () => void;
 }
 
@@ -485,8 +487,116 @@ function LetzplayStatusRow({ match }: { match: Match }) {
   );
 }
 
+// --------------- ADM: inserir escalação manualmente ---------------
+function AdminLineupBlock({
+  match,
+  side,
+  teamName,
+  teamId,
+  athletes,
+  lineup,
+  onChanged,
+}: {
+  match: Match;
+  side: "a" | "b";
+  teamName: string;
+  teamId: string | null;
+  athletes: Athlete[];
+  lineup: Lineup | undefined;
+  onChanged: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [fp1, setFp1] = useState(lineup?.female_player_1 ?? "");
+  const [fp2, setFp2] = useState(lineup?.female_player_2 ?? "");
+  const [mp1, setMp1] = useState(lineup?.male_player_1 ?? "");
+  const [mp2, setMp2] = useState(lineup?.male_player_2 ?? "");
+  const [mxp1, setMxp1] = useState(lineup?.mixed_player_1 ?? "");
+  const [mxp2, setMxp2] = useState(lineup?.mixed_player_2 ?? "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const catName = match.category_name;
+  const fem = athletes.filter((a) => a.gender === "Feminino" && (a.team_id === teamId || a.team_name === teamName) && (!catName || !a.category_name || a.category_name === catName));
+  const masc = athletes.filter((a) => a.gender === "Masculino" && (a.team_id === teamId || a.team_name === teamName) && (!catName || !a.category_name || a.category_name === catName));
+  const todos = athletes.filter((a) => (a.team_id === teamId || a.team_name === teamName) && (!catName || !a.category_name || a.category_name === catName));
+
+  const fakeTeam: Team = {
+    id: teamId ?? "",
+    team_name: teamName,
+    country: null,
+    abbreviation: null,
+    flag: null,
+    captain_name: null,
+    captain_phone: null,
+    status: "active",
+    created_at: "",
+    updated_at: "",
+  };
+
+  async function handleSave(status: "Rascunho" | "Enviada") {
+    setBusy(true);
+    setErr(null);
+    const e = await saveLineup(match, fakeTeam, {
+      female_player_1: fp1 || "",
+      female_player_2: fp2 || "",
+      male_player_1: mp1 || "",
+      male_player_2: mp2 || "",
+      mixed_player_1: mxp1 || "",
+      mixed_player_2: mxp2 || "",
+    }, status);
+    setBusy(false);
+    if (e) { setErr(e); return; }
+    onChanged();
+    if (status === "Enviada") setOpen(false);
+  }
+
+  function PlayerSelect({ label, value, onChange, list }: { label: string; value: string; onChange: (v: string) => void; list: Athlete[] }) {
+    return (
+      <FormSelect label={label} value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">— não definido —</option>
+        {list.map((a) => <option key={a.id} value={a.athlete_name}>{a.athlete_name}</option>)}
+      </FormSelect>
+    );
+  }
+
+  const listFem = fem.length ? fem : todos;
+  const listMasc = masc.length ? masc : todos;
+
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+      <button type="button" onClick={() => setOpen((o) => !o)} className="flex w-full items-center justify-between text-left">
+        <span className="text-sm font-bold text-branco-quente">{teamName}</span>
+        <span className="text-[11px] font-extrabold uppercase tracking-wider text-violet-400">{open ? "Fechar" : lineup?.lineup_status === "Enviada" ? "✓ Enviada · Editar" : "Inserir escalação"}</span>
+      </button>
+
+      {open && (
+        <div className="mt-3 space-y-3">
+          <p className="text-[10px] font-extrabold uppercase tracking-widest text-cream/50">Feminino</p>
+          <PlayerSelect label="Dupla feminina — jogadora 1" value={fp1} onChange={setFp1} list={listFem} />
+          <PlayerSelect label="Dupla feminina — jogadora 2" value={fp2} onChange={setFp2} list={listFem} />
+          <p className="text-[10px] font-extrabold uppercase tracking-widest text-cream/50">Masculino</p>
+          <PlayerSelect label="Dupla masculina — jogador 1" value={mp1} onChange={setMp1} list={listMasc} />
+          <PlayerSelect label="Dupla masculina — jogador 2" value={mp2} onChange={setMp2} list={listMasc} />
+          {match.mixed_required && (
+            <>
+              <p className="text-[10px] font-extrabold uppercase tracking-widest text-cream/50">Mista</p>
+              <PlayerSelect label="Dupla mista — jogadora" value={mxp1} onChange={setMxp1} list={listFem} />
+              <PlayerSelect label="Dupla mista — jogador" value={mxp2} onChange={setMxp2} list={listMasc} />
+            </>
+          )}
+          {err && <p className="text-xs text-red-400">{err}</p>}
+          <div className="flex gap-2">
+            <Button variant="ghost" full disabled={busy} onClick={() => handleSave("Rascunho")}>Salvar rascunho</Button>
+            <Button full disabled={busy} onClick={() => handleSave("Enviada")}>Enviar escalação</Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------------- Painel ----------------
-export default function MatchDetail({ match, courts, lineups, presence, results, onChanged }: MatchDetailProps) {
+export default function MatchDetail({ match, courts, lineups, presence, results, athletes = [], onChanged }: MatchDetailProps) {
   const status = match.match_status;
   const games = useMemo(() => resultsFor(match, results), [match, results]);
 
@@ -518,13 +628,26 @@ export default function MatchDetail({ match, courts, lineups, presence, results,
 
       <AdminEditBlock match={match} onChanged={onChanged} />
 
-      {/* Escalações recebidas */}
+      {/* Escalações */}
       <div className="space-y-2">
         <SectionTitle>Escalações</SectionTitle>
         {lineupRows.map(({ side, name, lineup }) => (
-          <div key={side} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
-            <span className="text-sm font-bold text-branco-quente">{name}</span>
-            <StatusPill status={lineup?.lineup_status === "Enviada" ? "Enviada" : lineup ? "Rascunho" : "Pendente"} />
+          <div key={side} className="space-y-1">
+            <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
+              <span className="text-sm font-bold text-branco-quente">{name}</span>
+              <StatusPill status={lineup?.lineup_status === "Enviada" ? "Enviada" : lineup ? "Rascunho" : "Pendente"} />
+            </div>
+            {athletes.length > 0 && (
+              <AdminLineupBlock
+                match={match}
+                side={side}
+                teamName={name}
+                teamId={side === "a" ? match.team_a_id : match.team_b_id}
+                athletes={athletes}
+                lineup={lineup ?? undefined}
+                onChanged={onChanged}
+              />
+            )}
           </div>
         ))}
       </div>

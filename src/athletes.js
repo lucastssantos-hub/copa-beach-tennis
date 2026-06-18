@@ -80,7 +80,7 @@ export const ATHLETES_BY_TEAM_CAT = {
       men: [{"id": "aus-35plus-m1", "name": "Guilherme Dolci", "categories": ["35+"]}, {"id": "aus-35plus-m2", "name": "Rafael Pereira", "categories": ["35+"]}],
     },
     "60+": {
-      women: [{"id": "aus-60plus-w1", "name": "Marina Dolci", "categories": ["60+"]}],
+      women: [{"id": "aus-60plus-w1", "name": "Alessandra Gauza", "categories": ["60+"]}, {"id": "aus-60plus-w2", "name": "Marina Dolci", "categories": ["60+"]}],
       men: [{"id": "aus-60plus-m1", "name": "Jaqueline Kohut", "categories": ["60+"]}, {"id": "aus-60plus-m2", "name": "José Fernando Mello", "categories": ["60+"]}, {"id": "aus-60plus-m3", "name": "Mattheus Salvadori", "categories": ["60+"]}],
     },
     "A": {
@@ -258,7 +258,7 @@ export const ATHLETES_BY_TEAM_CAT = {
       men: [{"id": "itá-35plus-m1", "name": "Batata Ferri", "categories": ["35+"]}, {"id": "itá-35plus-m2", "name": "Rubinho Fin", "categories": ["35+"]}],
     },
     "60+": {
-      women: [],
+      women: [{"id": "itá-60plus-w1", "name": "Evely Costa", "categories": ["60+"]}, {"id": "itá-60plus-w2", "name": "Gabriela Rezende", "categories": ["60+"]}],
       men: [{"id": "itá-60plus-m1", "name": "Marcos Santos", "categories": ["60+"]}, {"id": "itá-60plus-m2", "name": "Renan Lucini", "categories": ["60+"]}],
     },
     "A": {
@@ -352,7 +352,7 @@ export const ATHLETES_BY_TEAM_CAT = {
     },
     "60+": {
       women: [{"id": "por-60plus-w1", "name": "Adriana Tomadon", "categories": ["60+"]}, {"id": "por-60plus-w2", "name": "Gabriela Izaguirre", "categories": ["60+"]}, {"id": "por-60plus-w3", "name": "Helo Gralik", "categories": ["60+"]}],
-      men: [{"id": "por-60plus-m1", "name": "Edson Ardenghi", "categories": ["60+"]}, {"id": "por-60plus-m2", "name": "Rodrigo Frasson", "categories": ["60+"]}],
+      men: [{"id": "por-60plus-m1", "name": "David Souza", "categories": ["60+"]}, {"id": "por-60plus-m2", "name": "Edson Ardenghi", "categories": ["60+"]}, {"id": "por-60plus-m3", "name": "Fernando Nery", "categories": ["60+"]}, {"id": "por-60plus-m4", "name": "Rodrigo Frasson", "categories": ["60+"]}],
     },
     "A": {
       women: [{"id": "por-a-w1", "name": "Gabriela Izaguirre", "categories": ["A"]}, {"id": "por-a-w2", "name": "Juliana Wilt", "categories": ["A"]}],

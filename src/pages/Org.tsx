@@ -19,6 +19,7 @@ import { createAuditLog } from "../lib/actions";
 import { READINESS_BUCKETS, isGroupPhase, readinessBucket, type ReadinessBucket } from "../lib/engine";
 import {
   CATEGORY_CHIPS,
+  type Athlete,
   type AuditLog,
   type Category,
   type Court,
@@ -568,6 +569,7 @@ export default function Org() {
   const { data: teams } = useTable<Team>("teams", { orderBy: "team_name", ascending: true });
   const { data: notifications } = useTable<Notification>("notifications", { limit: 50, pollMs: 15000 });
   const { data: auditLogs } = useTable<AuditLog>("audit_logs", { limit: 50, pollMs: 15000 });
+  const { data: athletes } = useTable<Athlete>("athletes", { pollMs: 120000 });
   const { data: lineups, refresh: refreshLineups } = useTable<Lineup>("lineups", { pollMs: 10000 });
   const { data: presence, refresh: refreshPresence } = useTable<Presence>("presence", { pollMs: 10000 });
   const { data: results, refresh: refreshResults } = useTable<Result>("results", { pollMs: 10000 });
@@ -775,6 +777,7 @@ export default function Org() {
                                   lineups={lineups}
                                   presence={presence}
                                   results={results}
+                                  athletes={athletes}
                                   onChanged={refreshOps}
                                 />
                               )}

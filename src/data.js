@@ -126,12 +126,12 @@ export const CATEGORY_DRAWS = {
     ],
   },
   "60+": {
-    participants: 57,
+    participants: 46,
     groups: [
-      group(1, ["AUS", "POR", "SWE", "GER"],  [["POR","AUS"],["AUS","SWE"],["SWE","POR"],["GER","AUS"],["GER","POR"],["GER","SWE"]]),
-      group(2, ["JAM", "NOR", "ENG"],          [["JAM","ENG"],["NOR","ENG"],["NOR","JAM"]]),
-      group(3, ["ARG", "CAN", "ITA"],          [["ARG","ITA"],["CAN","ITA"],["CAN","ARG"]]),
-      group(4, ["ARU", "BRA", "FRA", "USA"],  [["USA","BRA"],["FRA","ARU"],["BRA","FRA"],["USA","FRA"],["ARU","USA"],["ARU","BRA"]]),
+      group(1, ["BRA", "USA", "ARG"],  [["ARG","BRA"],["BRA","USA"],["USA","ARG"]]),
+      group(2, ["POR", "NED", "SWE"],  [["SWE","POR"],["NED","POR"],["SWE","NED"]]),
+      group(3, ["FRA", "NOR", "JAM"],  [["FRA","JAM"],["FRA","NOR"],["JAM","NOR"]]),
+      group(4, ["CAN", "AUS", "ITA"],  [["CAN","ITA"],["ITA","AUS"],["CAN","AUS"]]),
     ],
   },
 };
