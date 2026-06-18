@@ -599,6 +599,7 @@ function AdminLineupBlock({
 export default function MatchDetail({ match, courts, lineups, presence, results, athletes = [], onChanged }: MatchDetailProps) {
   const status = match.match_status;
   const games = useMemo(() => resultsFor(match, results), [match, results]);
+  const [adminResult, setAdminResult] = useState(false);
 
   const lineupRows = (["a", "b"] as const).map((side) => ({
     side,
@@ -610,7 +611,7 @@ export default function MatchDetail({ match, courts, lineups, presence, results,
     (status === "Aguardando escalação" && lineups.some((l) => l.match_id === match.id));
   const showRelease = status === "Pronto para quadra";
   const showStart = status === "Liberado para quadra";
-  const showResults = status === "Em andamento";
+  const showResults = status === "Em andamento" || adminResult;
   const contested = status === "Resultado contestado";
   const walkover = status === "W.O." || status === "Desistência";
   const finished = status === "Finalizado" || contested || walkover;
@@ -688,9 +689,32 @@ export default function MatchDetail({ match, courts, lineups, presence, results,
         </div>
       )}
 
+      {/* ADM: inserir resultado sem passar pelo fluxo normal */}
+      {!showResults && !finished && (
+        <Button
+          variant="ghost"
+          full
+          onClick={async () => {
+            await startMatch(match);
+            setAdminResult(true);
+            onChanged();
+          }}
+        >
+          ✏ Inserir resultado (ADM)
+        </Button>
+      )}
+
       {showResults && <ResultsBlock match={match} results={results} onChanged={onChanged} />}
 
       {contested && <ContestResolveBlock match={match} onChanged={onChanged} />}
+
+      {/* ADM: corrigir resultado já lançado */}
+      {finished && !adminResult && (
+        <Button variant="ghost" full onClick={() => setAdminResult(true)}>
+          ✏ Corrigir resultado (ADM)
+        </Button>
+      )}
+      {finished && adminResult && <ResultsBlock match={match} results={results} onChanged={onChanged} />}
 
       {finished && (
         <div className="space-y-2">
