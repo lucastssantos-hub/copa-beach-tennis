@@ -43,6 +43,7 @@ const ADMIN_PIN_SHA256 =
 
 const TABS = [
   { id: "ops", label: "OPS" },
+  { id: "escal", label: "ESCAL" },
   { id: "conf", label: "CONF" },
   { id: "letz", label: "LETZ" },
   { id: "class", label: "CLASS" },
@@ -789,6 +790,59 @@ export default function Org() {
                   )}
                 )}
               </div>
+            )}
+          </section>
+        )}
+
+        {tab === "escal" && (
+          <section className="space-y-4">
+            <h2 className="text-lg font-extrabold text-branco-quente">
+              Escalações{selectedCategories.length === 1 ? ` — Cat. ${selectedCategories[0]}` : ""}
+            </h2>
+            {filteredMatches.length === 0 ? (
+              <p className="text-sm text-cream/50">Nenhum confronto para a categoria selecionada.</p>
+            ) : (
+              filteredMatches.map((m) => {
+                const matchLineups = lineups.filter((l) => l.match_id === m.id);
+                return (
+                  <div key={m.id} className="rounded-3xl border border-white/10 bg-white/[0.05] p-4 space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-extrabold text-branco-quente">
+                        {m.team_a_flag} {m.team_a_abbreviation} × {m.team_b_flag} {m.team_b_abbreviation}
+                      </p>
+                      <span className="text-[11px] font-bold text-cream/50">{m.group_or_phase} · Cat. {m.category_name}</span>
+                    </div>
+                    {matchLineups.length === 0 ? (
+                      <p className="text-xs text-cream/40">Nenhuma escalação enviada.</p>
+                    ) : (
+                      matchLineups.map((l) => (
+                        <div key={l.id} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-extrabold text-branco-quente">{l.team_name}</p>
+                            <span className={`text-[11px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                              l.lineup_status === "Enviada" ? "bg-emerald-500/20 text-emerald-300" :
+                              l.lineup_status === "Confirmada" ? "bg-blue-500/20 text-blue-300" :
+                              "bg-amber-500/20 text-amber-300"
+                            }`}>{l.lineup_status}</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-cream/80">
+                            <div><span className="font-bold text-cream/50">Fem 1:</span> {l.female_player_1 || "—"}</div>
+                            <div><span className="font-bold text-cream/50">Fem 2:</span> {l.female_player_2 || "—"}</div>
+                            <div><span className="font-bold text-cream/50">Masc 1:</span> {l.male_player_1 || "—"}</div>
+                            <div><span className="font-bold text-cream/50">Masc 2:</span> {l.male_player_2 || "—"}</div>
+                            {(l.mixed_player_1 || l.mixed_player_2) && (
+                              <>
+                                <div><span className="font-bold text-cream/50">Mista F:</span> {l.mixed_player_1 || "—"}</div>
+                                <div><span className="font-bold text-cream/50">Mista M:</span> {l.mixed_player_2 || "—"}</div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                );
+              })
             )}
           </section>
         )}
