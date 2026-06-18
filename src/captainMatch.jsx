@@ -1,9 +1,10 @@
 // ============ Captain — Match detail / Escalação / Contestação ============
 import { useState } from "react";
 import { TEAMS, athleteName, confrontoScore, teamName, getAthletesByCategory } from "./data.js";
-import { STATUS, isTerminal, needsMista, saveDraftLineup, submitLineup, submitMista, contestResult } from "./engine.js";
+import { STATUS, isTerminal, needsMista, confrontoDecided, saveDraftLineup, submitLineup, submitMista, contestResult, recordGame, submitResult } from "./engine.js";
 import { AppBar, Card, StatusPill, Eyebrow, Button, Flag } from "./components.jsx";
 import { DuoPicker } from "./captainHome.jsx";
+import { ScoreEditor, GameRow } from "./arbMatch.jsx";
 
 export function CaptainMatch({ match, onBack, dispatch, toast, me }) {
   const opp = match.a === me ? match.b : match.a;
@@ -19,11 +20,18 @@ export function CaptainMatch({ match, onBack, dispatch, toast, me }) {
   const [mistaM, setMistaM] = useState(lineup.mista ? lineup.mista.m : null);
   const [contesting, setContesting] = useState(false);
   const [reason, setReason] = useState("");
+  const [editingGame, setEditingGame] = useState(null);
 
   const score = confrontoScore(match);
   const tied = needsMista(match); // 1×1, mista ainda não decidida
   const mistaSent = !!lineup.mista;
   const canContest = match.status === STATUS.AGUARDANDO_RESULTADO || match.status === STATUS.FINALIZADO;
+  const inPlay = match.status === STATUS.EM_JOGO;
+  const game1Done = !!match.games.fem?.winner;
+  const game2Done = !!match.games.masc?.winner;
+  const mistaDone = !!match.games.mista?.winner;
+  const bothMistaSent = Object.values(match.lineups).every(l => !!l.mista);
+  const decided = confrontoDecided(match);
 
   function pickInto(list, setList, id) {
     if (list.includes(id)) setList(list.map(x => x === id ? null : x));
@@ -51,6 +59,16 @@ export function CaptainMatch({ match, onBack, dispatch, toast, me }) {
     dispatch(contestResult(match, reason.trim(), { actor: "capitao" }));
     toast("Contestação enviada à Organização");
     setContesting(false); setReason("");
+  }
+  function saveScore(gameKey, result) {
+    dispatch(recordGame(match, gameKey, result, { actor: "capitao" }));
+    setEditingGame(null);
+    toast("Placar registrado");
+  }
+  function doSubmitResult() {
+    dispatch(submitResult(match, { actor: "capitao" }));
+    toast("Resultado enviado para validação da Organização");
+    onBack();
   }
 
   return (
@@ -145,6 +163,30 @@ export function CaptainMatch({ match, onBack, dispatch, toast, me }) {
             </div>
           )}
 
+          {/* Lançamento de placar — EM_JOGO */}
+          {inPlay && (
+            <div style={{ marginTop: 22 }}>
+              <Eyebrow>Placar dos jogos</Eyebrow>
+              <div style={{ display: "flex", flexDirection: "column", gap: 9, marginTop: 12 }}>
+                <GameRow n="1" label="Feminina" game={match.games.fem} match={match}
+                  canEdit={!game1Done} onEdit={() => setEditingGame("fem")} />
+                <GameRow n="2" label="Masculina" game={match.games.masc} match={match}
+                  canEdit={game1Done && !game2Done} locked={!game1Done}
+                  onEdit={() => setEditingGame("masc")} />
+                <GameRow n="3" label="Mista" game={match.games.mista} match={match} mista
+                  visible={tied || mistaDone}
+                  waiting={tied && !mistaDone && !bothMistaSent}
+                  canEdit={tied && !mistaDone && bothMistaSent}
+                  onEdit={() => setEditingGame("mista")} />
+              </div>
+              {decided && (
+                <div style={{ marginTop: 14 }}>
+                  <Button full onClick={doSubmitResult}>✓ Encerrar e enviar resultado</Button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Contestação */}
           {canContest && match.status !== STATUS.RESULTADO_CONTESTADO && (
             <div style={{ marginTop: 20 }}>
@@ -173,6 +215,7 @@ export function CaptainMatch({ match, onBack, dispatch, toast, me }) {
           )}
         </>
       )}
+      {editingGame && <ScoreEditor match={match} gameKey={editingGame} onCancel={() => setEditingGame(null)} onSave={r => saveScore(editingGame, r)} />}
     </div>
   );
 }
