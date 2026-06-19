@@ -569,6 +569,8 @@ export function readinessBucket(status: MatchStatus): ReadinessBucket {
     case "W.O.":
     case "Desistência":
       return "finalizados";
+    default:
+      return "pendentes";
   }
 }
 
