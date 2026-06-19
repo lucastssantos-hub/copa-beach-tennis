@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import Button from "./Button";
 import FormInput, { FormSelect } from "./FormInput";
 import StatusPill from "./StatusPill";
+import ResultModal from "./ResultModal";
 import {
   advanceMatchStatus,
   recordGameResult,
@@ -600,6 +601,7 @@ export default function MatchDetail({ match, courts, lineups, presence, results,
   const status = match.match_status;
   const games = useMemo(() => resultsFor(match, results), [match, results]);
   const [adminResult, setAdminResult] = useState(false);
+  const [resultModalOpen, setResultModalOpen] = useState(false);
 
   const lineupRows = (["a", "b"] as const).map((side) => ({
     side,
@@ -689,15 +691,14 @@ export default function MatchDetail({ match, courts, lineups, presence, results,
         </div>
       )}
 
-      {/* ADM: inserir resultado sem passar pelo fluxo normal */}
+      {/* ADM: inserir resultado via modal (não abre mais inline) */}
       {!showResults && !finished && (
         <Button
           variant="ghost"
           full
-          onClick={async () => {
-            await startMatch(match);
-            setAdminResult(true);
-            onChanged();
+          onClick={() => {
+            console.log("RESULT_MODAL_OPEN", { matchId: match.id, role: "org" });
+            setResultModalOpen(true);
           }}
         >
           ✏ Inserir resultado (ADM)
@@ -709,12 +710,18 @@ export default function MatchDetail({ match, courts, lineups, presence, results,
       {contested && <ContestResolveBlock match={match} onChanged={onChanged} />}
 
       {/* ADM: corrigir resultado já lançado */}
-      {finished && !adminResult && (
-        <Button variant="ghost" full onClick={() => setAdminResult(true)}>
-          ✏ Corrigir resultado (ADM)
+      {(finished || contested) && (
+        <Button
+          variant="ghost"
+          full
+          onClick={() => {
+            console.log("RESULT_MODAL_OPEN", { matchId: match.id, role: "org", mode: "edit" });
+            setResultModalOpen(true);
+          }}
+        >
+          ✏ {finished ? "Corrigir" : "Editar"} resultado (ADM)
         </Button>
       )}
-      {finished && adminResult && <ResultsBlock match={match} results={results} onChanged={onChanged} />}
 
       {finished && (
         <div className="space-y-2">
@@ -739,6 +746,15 @@ export default function MatchDetail({ match, courts, lineups, presence, results,
 
       {/* W.O. / Desistência: disponível enquanto o confronto não terminou em quadra */}
       {!finished && <WalkoverBlock match={match} results={results} onChanged={onChanged} />}
+
+      <ResultModal
+        isOpen={resultModalOpen}
+        onClose={() => setResultModalOpen(false)}
+        match={match}
+        results={results}
+        role="org"
+        onChanged={() => { setResultModalOpen(false); onChanged(); }}
+      />
     </div>
   );
 }

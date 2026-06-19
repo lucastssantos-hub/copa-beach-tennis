@@ -7,6 +7,7 @@ import Button from "../components/Button";
 import FormInput, { FormSelect } from "../components/FormInput";
 import KnockoutBracketPreview from "../components/KnockoutBracketPreview";
 import StatusPill from "../components/StatusPill";
+import ResultModal from "../components/ResultModal";
 import { useTable } from "../lib/useTable";
 import { supabase, supabaseConfigured } from "../lib/supabase";
 import {
@@ -308,6 +309,7 @@ function CaptainMatchView({
   const [error, setError] = useState<string | null>(null);
   const [contesting, setContesting] = useState(false);
   const [reason, setReason] = useState("");
+  const [resultModalOpen, setResultModalOpen] = useState(false);
 
   useEffect(() => {
     if (!editingSubmitted) {
@@ -519,6 +521,25 @@ function CaptainMatchView({
         </div>
       )}
 
+      {/* Botão "Inserir resultado" para o capitão */}
+      {!terminal && !contested && !walkover && side && (
+        <div className="rounded-3xl border border-coral/30 bg-white/[0.05] p-4">
+          <p className="mb-2 text-sm font-extrabold uppercase tracking-wide text-coral">Resultado do confronto</p>
+          <p className="mb-3 text-xs font-semibold text-cream/60">
+            Informe o resultado após o término dos jogos. A organização confirmará.
+          </p>
+          <Button
+            full
+            onClick={() => {
+              console.log("RESULT_MODAL_OPEN", { matchId: match.id, role: "captain", country: team.team_name });
+              setResultModalOpen(true);
+            }}
+          >
+            Inserir resultado
+          </Button>
+        </div>
+      )}
+
       {/* Resultado / parciais */}
       {showResultCard && (
         <div className="space-y-3 rounded-3xl border border-white/10 bg-white/[0.05] p-4">
@@ -565,6 +586,16 @@ function CaptainMatchView({
           ) : null}
         </div>
       )}
+
+      <ResultModal
+        isOpen={resultModalOpen}
+        onClose={() => setResultModalOpen(false)}
+        match={match}
+        results={results}
+        role="captain"
+        captainTeamName={team.team_name}
+        onChanged={() => { setResultModalOpen(false); onChanged(); }}
+      />
     </div>
   );
 }
