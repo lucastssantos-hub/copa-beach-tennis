@@ -695,11 +695,22 @@ function CaptainPanel({ team, onLogout }: { team: Team; onLogout: () => void }) 
               lineups={lineups}
               presence={presence}
               results={results}
-              athletes={athletes.filter(
-                (a) =>
-                  (a.team_id === team.id || a.team_name === team.team_name) &&
-                  (a.category_name === selected.category_name || !a.category_name),
-              )}
+              athletes={(() => {
+                // Filtro primário: mesma equipe + mesma categoria (ou sem categoria)
+                const catFiltered = athletes.filter(
+                  (a) =>
+                    (a.team_id === team.id || a.team_name === team.team_name) &&
+                    (a.category_name === selected.category_name || !a.category_name),
+                );
+                // Fallback: se não há atletas suficientes (mínimo 4: 2 fem + 2 masc),
+                // mostra todos os atletas da equipe independente de categoria.
+                // Necessário quando atletas estão cadastrados em categoria diferente
+                // do confronto (ex: França Cat:C jogando confronto 60+).
+                if (catFiltered.length >= 4) return catFiltered;
+                return athletes.filter(
+                  (a) => a.team_id === team.id || a.team_name === team.team_name,
+                );
+              })()}
               onBack={() => setSelectedId(null)}
               onChanged={refresh}
               onSent={() => startWarmup(selected.id)}
