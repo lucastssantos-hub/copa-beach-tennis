@@ -947,6 +947,63 @@ export default function Org() {
         {tab === "cfg" && (
           <section className="space-y-3">
             <h2 className="text-lg font-extrabold text-branco-quente">Configuração</h2>
+
+            {/* Diagnóstico do sistema */}
+            <div className="animate-fade-in-up space-y-3 rounded-3xl border border-white/10 bg-white/[0.05] p-5">
+              <p className="text-[11px] font-bold uppercase tracking-widest text-coral">Diagnóstico do sistema</p>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
+                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-cream/50">Confrontos</p>
+                  <p className="font-display text-2xl text-branco-quente">{matches.length}</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
+                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-cream/50">Atletas</p>
+                  <p className="font-display text-2xl text-branco-quente">{athletes.length}</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
+                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-cream/50">Escalações</p>
+                  <p className="font-display text-2xl text-branco-quente">{lineups.length}</p>
+                  <p className="text-[10px] text-cream/50">{lineups.filter((l) => l.lineup_status === "Enviada").length} enviadas</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
+                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-cream/50">Seleções</p>
+                  <p className="font-display text-2xl text-branco-quente">{teams.length}</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
+                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-cream/50">Quadras</p>
+                  <p className="font-display text-2xl text-branco-quente">{courts.length}</p>
+                  <p className="text-[10px] text-cream/50">{courts.filter((c) => c.court_status === "Livre").length} livres</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2">
+                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-cream/50">Supabase</p>
+                  <p className={`text-xs font-extrabold ${supabaseConfigured ? "text-emerald-300" : "text-coral"}`}>
+                    {supabaseConfigured ? "✓ Conectado" : "✗ Desconectado"}
+                  </p>
+                </div>
+              </div>
+              <div className="border-t border-white/10 pt-3">
+                <p className="text-[10px] font-extrabold uppercase tracking-wider text-cream/50">Categorias no banco</p>
+                <p className="mt-1 text-xs font-semibold text-cream/70">
+                  {categories.length === 0
+                    ? "Nenhuma categoria cadastrada"
+                    : categories.map((c) => c.category_name).join(", ")}
+                </p>
+              </div>
+              <div className="border-t border-white/10 pt-3">
+                <p className="text-[10px] font-extrabold uppercase tracking-wider text-cream/50">
+                  Escalações pendentes (enviadas sem quadra)
+                </p>
+                <p className="mt-1 text-xs font-semibold text-cream/70">
+                  {lineups.filter((l) => l.lineup_status === "Enviada").length === 0
+                    ? "Nenhuma pendente"
+                    : `${lineups.filter((l) => l.lineup_status === "Enviada").length} escalações enviadas`}
+                </p>
+              </div>
+              <p className="text-[10px] text-cream/40">
+                Atualizado: {new Date().toLocaleString("pt-BR")}
+              </p>
+            </div>
+
             <CaptainAccessManager />
             <div className="animate-fade-in-up space-y-4 rounded-3xl border border-white/10 bg-white/[0.05] p-5">
               <div>

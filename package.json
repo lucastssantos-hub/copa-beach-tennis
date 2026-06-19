@@ -8,7 +8,8 @@
     "build": "vite build && node scripts/prepare-gh-pages-routes.mjs",
     "build:capitao": "APP=capitao vite build && mv dist-capitao/legacy-capitao.html dist-capitao/index.html",
     "deploy:capitao": "bash scripts/deploy-capitao.sh",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "healthcheck": "node scripts/healthcheck-copa.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.1",

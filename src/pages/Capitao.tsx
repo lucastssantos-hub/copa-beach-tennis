@@ -24,6 +24,7 @@ import {
   winnerSide,
 } from "../lib/engine";
 import { CATEGORY_CHIPS, type Athlete, type Lineup, type Match, type Presence, type Result, type Team } from "../lib/types";
+import { normalizeGender } from "../lib/normalize";
 
 const SESSION_KEY = "copa-capitao-team";
 const WARMUP_KEY = "copa-capitao-warmup";
@@ -73,7 +74,7 @@ function CaptainLogin({ onLogin }: LoginProps) {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!supabase) {
-      setError("Supabase não configurado. Veja o README.");
+      setError("Sem conexão com o servidor. Verifique a internet e tente novamente.");
       return;
     }
     const query = teamQuery.trim();
@@ -370,8 +371,10 @@ function CaptainMatchView({
     onChanged();
   }
 
-  const femininas = athletes.filter((a) => a.gender === "Feminino").map((a) => a.athlete_name);
-  const masculinos = athletes.filter((a) => a.gender === "Masculino").map((a) => a.athlete_name);
+  const isFeminina = (a: Athlete) => normalizeGender(a.gender ?? "") === "Feminino";
+  const isMasculino = (a: Athlete) => normalizeGender(a.gender ?? "") === "Masculino";
+  const femininas = athletes.filter(isFeminina).map((a) => a.athlete_name);
+  const masculinos = athletes.filter(isMasculino).map((a) => a.athlete_name);
 
   // Mista: atleta 1 do feminino, atleta 2 do masculino.
   const lineupFields: Array<{
@@ -396,6 +399,7 @@ function CaptainMatchView({
     },
   ];
   const locked = submitted && !editingSubmitted;
+  const noAthletes = femininas.length === 0 && masculinos.length === 0;
 
   return (
     <div className="animate-fade-in-up space-y-4 px-5 pt-2">
@@ -467,6 +471,11 @@ function CaptainMatchView({
             <p className="text-sm font-extrabold uppercase tracking-wide text-coral">Sua escalação</p>
             <StatusPill status={myLineup ? myLineup.lineup_status : "Pendente"} />
           </div>
+          {noAthletes && !locked && (
+            <p className="rounded-2xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-xs font-bold text-amber-300">
+              ⚠ Esta equipe ainda não tem atletas cadastrados nesta categoria. Procure a organização ou preencha os nomes manualmente.
+            </p>
+          )}
           {lineupFields.map(({ title, a, b, optionsA, optionsB, dim }) => (
             <div key={a} className={dim && !locked ? "opacity-50" : ""}>
               <p className="mb-1 text-[11px] font-extrabold uppercase tracking-widest text-cream/60">{title}</p>
