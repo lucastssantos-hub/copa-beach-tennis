@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import AppShell from "../components/AppShell";
 import Header from "../components/Header";
 import BottomNav from "../components/BottomNav";
-import MatchDetail from "../components/MatchDetail";
+import MatchDetailsModal from "../components/MatchDetailsModal";
 import MatchReadinessCard from "../components/MatchReadinessCard";
 import CourtGridCompact from "../components/CourtGridCompact";
 import EmptyState from "../components/EmptyState";
@@ -553,7 +553,7 @@ export default function Org() {
   const [tab, setTab] = useState("ops");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [modalMatch, setModalMatch] = useState<Match | null>(null);
   const [bucket, setBucket] = useState<ReadinessBucket>("pendentes");
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
@@ -620,7 +620,7 @@ export default function Org() {
     sessionStorage.removeItem(ADMIN_SESSION_KEY);
     sessionStorage.removeItem(ADMIN_PIN_SESSION_KEY);
     setAdminAuthed(false);
-    setSelectedId(null);
+    setModalMatch(null);
   }
 
   function collapseKey(label: string) {
@@ -630,15 +630,15 @@ export default function Org() {
   function toggleGroup(label: string, rows: Match[]) {
     const key = collapseKey(label);
     const nextCollapsed = !collapsedGroups[key];
-    if (nextCollapsed && selectedId && rows.some((m) => m.id === selectedId)) {
-      setSelectedId(null);
+    if (nextCollapsed && modalMatch && rows.some((m) => m.id === modalMatch.id)) {
+      setModalMatch(null);
     }
     setCollapsedGroups((prev) => ({ ...prev, [key]: nextCollapsed }));
   }
 
   function setAllGroups(collapsed: boolean) {
     const next = Object.fromEntries(groupedBucket.map((group) => [collapseKey(group.label), collapsed]));
-    if (collapsed) setSelectedId(null);
+    if (collapsed) setModalMatch(null);
     setCollapsedGroups((prev) => ({ ...prev, ...next }));
   }
 
@@ -760,29 +760,17 @@ export default function Org() {
                       {!collapsed && (
                         <div className="space-y-3">
                           {group.rows.map((m) => (
-                            <div key={m.id} className="space-y-3">
-                              <MatchReadinessCard
-                                match={m}
-                                courts={courts}
-                                lineups={lineups}
-                                results={results}
-                                selected={m.id === selectedId}
-                                onOpen={() => setSelectedId(m.id === selectedId ? null : m.id)}
-                                onEnsureOpen={() => setSelectedId(m.id)}
-                                onChanged={refreshOps}
-                              />
-                              {m.id === selectedId && (
-                                <MatchDetail
-                                  match={m}
-                                  courts={courts}
-                                  lineups={lineups}
-                                  presence={presence}
-                                  results={results}
-                                  athletes={athletes}
-                                  onChanged={refreshOps}
-                                />
-                              )}
-                            </div>
+                            <MatchReadinessCard
+                              key={m.id}
+                              match={m}
+                              courts={courts}
+                              lineups={lineups}
+                              results={results}
+                              selected={m.id === modalMatch?.id}
+                              onOpen={() => setModalMatch(m)}
+                              onEnsureOpen={() => setModalMatch(m)}
+                              onChanged={refreshOps}
+                            />
                           ))}
                         </div>
                       )}
@@ -1037,6 +1025,17 @@ export default function Org() {
           </section>
         )}
       </main>
+
+      <MatchDetailsModal
+        isOpen={!!modalMatch}
+        onClose={() => setModalMatch(null)}
+        match={modalMatch!}
+        courts={courts}
+        lineups={lineups}
+        presence={presence}
+        results={results}
+        onChanged={refreshOps}
+      />
 
       <BottomNav items={TABS} active={tab} onChange={setTab} />
     </AppShell>

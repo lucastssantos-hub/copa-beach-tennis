@@ -259,8 +259,8 @@ export default function MatchReadinessCard({
         >
           {MIXED_LABEL[mix]}
         </span>
-        <span className="font-mono uppercase tracking-wider text-cream/50">
-          {selected ? "Fechar ▴" : "Abrir ▸"}
+        <span className={`font-mono uppercase tracking-wider text-[11px] ${selected ? "text-coral" : "text-cream/50"}`}>
+          {selected ? "Aberto ▴" : "Ver detalhes →"}
         </span>
       </div>
 
