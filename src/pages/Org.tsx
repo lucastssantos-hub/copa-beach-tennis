@@ -363,6 +363,45 @@ function NewMatchForm({ categories, teams, onCreated, onClose }: NewMatchFormPro
   );
 }
 
+function BracketMatchEditor({ match, teams, onClose, onSaved }: { match: Match; teams: Team[]; onClose: () => void; onSaved: () => void }) {
+  const [teamAId, setTeamAId] = useState(match.team_a_id || "");
+  const [teamBId, setTeamBId] = useState(match.team_b_id || "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    const a = teams.find((team) => team.id === teamAId);
+    const b = teams.find((team) => team.id === teamBId);
+    if (!a || !b || a.id === b.id) {
+      setError("Selecione duas equipes diferentes.");
+      return;
+    }
+    if (!supabase) return setError("Supabase não configurado.");
+    setSaving(true);
+    setError(null);
+    const { error: err } = await supabase.from("matches").update({
+      team_a_id: a.id, team_a_name: a.team_name, team_a_abbreviation: a.abbreviation, team_a_flag: a.flag,
+      team_b_id: b.id, team_b_name: b.team_name, team_b_abbreviation: b.abbreviation, team_b_flag: b.flag,
+      match_status: "Aguardando escalação", synced_escalacao: false, letzplay_synced_at: null,
+    }).eq("id", match.id);
+    setSaving(false);
+    if (err) return setError(err.message);
+    await createAuditLog({ actor: "ORG", action: "DEFINIR_CHAVE", entity: "matches", details: `${a.team_name} x ${b.team_name} — ${match.category_name} ${match.group_or_phase} ${match.round}` });
+    onSaved();
+    onClose();
+  }
+
+  return <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/75 p-4 backdrop-blur-sm sm:items-center">
+    <div className="w-full max-w-md space-y-4 rounded-3xl border border-white/15 bg-roxo-escuro p-5 shadow-2xl">
+      <div><p className="text-[11px] font-extrabold uppercase tracking-widest text-coral">Editar confronto eliminatório</p><p className="mt-1 text-lg font-extrabold text-branco-quente">{match.group_or_phase} · {match.round}</p></div>
+      <FormSelect label="Equipe A" value={teamAId} onChange={(event) => setTeamAId(event.target.value)}><option value="">Selecione…</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.flag || "🏳️"} {team.team_name}</option>)}</FormSelect>
+      <FormSelect label="Equipe B" value={teamBId} onChange={(event) => setTeamBId(event.target.value)}><option value="">Selecione…</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.flag || "🏳️"} {team.team_name}</option>)}</FormSelect>
+      {error && <p className="text-sm font-bold text-coral">{error}</p>}
+      <div className="flex gap-2"><Button variant="ghost" className="flex-1" onClick={onClose}>Cancelar</Button><Button className="flex-1" disabled={saving} onClick={save}>{saving ? "Salvando…" : "Liberar escalação"}</Button></div>
+    </div>
+  </div>;
+}
+
 interface CaptainAccessRow {
   team_id: string;
   team_name: string;
@@ -554,6 +593,7 @@ export default function Org() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [modalMatch, setModalMatch] = useState<Match | null>(null);
+  const [bracketMatch, setBracketMatch] = useState<Match | null>(null);
   const [bucket, setBucket] = useState<ReadinessBucket>("pendentes");
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
@@ -869,6 +909,7 @@ export default function Org() {
             <KnockoutBracketPreview
               categoryName={classCategory}
               matches={matches.filter((m) => m.category_name === classCategory)}
+              onEdit={setBracketMatch}
             />
             {classGroups.length === 0 ? (
               <EmptyState
@@ -1039,6 +1080,7 @@ export default function Org() {
         results={results}
         onChanged={refreshOps}
       />
+      {bracketMatch && <BracketMatchEditor match={bracketMatch} teams={teams} onClose={() => setBracketMatch(null)} onSaved={refreshOps} />}
 
       <BottomNav items={TABS} active={tab} onChange={setTab} />
     </AppShell>

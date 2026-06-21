@@ -22,9 +22,9 @@ function phaseLabel(phase: string) {
   return phase;
 }
 
-function MatchNode({ match, withConnector }: { match: Match; withConnector: boolean }) {
+function MatchNode({ match, withConnector, onEdit }: { match: Match; withConnector: boolean; onEdit?: (match: Match) => void }) {
   return (
-    <div className="relative min-w-[190px]">
+    <button type="button" onClick={() => onEdit?.(match)} className="relative min-w-[190px] text-left transition hover:-translate-y-0.5 hover:brightness-125 focus:outline-none focus:ring-2 focus:ring-coral/80">
       <div className="rounded-xl border border-white/15 bg-roxo-escuro/70 shadow-lg shadow-black/10">
         <p className="border-b border-white/10 px-3 py-1.5 text-[9px] font-extrabold uppercase tracking-wider text-coral">
           {match.round || match.group_or_phase}
@@ -35,11 +35,11 @@ function MatchNode({ match, withConnector }: { match: Match; withConnector: bool
       {withConnector && (
         <span aria-hidden="true" className="absolute left-full top-1/2 h-px w-6 bg-cream/35" />
       )}
-    </div>
+    </button>
   );
 }
 
-export default function KnockoutBracketPreview({ categoryName, matches = [] }: { categoryName: string | null; matches?: Match[] }) {
+export default function KnockoutBracketPreview({ categoryName, matches = [], onEdit }: { categoryName: string | null; matches?: Match[]; onEdit?: (match: Match) => void }) {
   const knockout = matches
     .filter((match) => PHASES.includes(match.group_or_phase || ""))
     .sort((a, b) => phaseRank(a.group_or_phase) - phaseRank(b.group_or_phase) || (a.round || "").localeCompare(b.round || "", "pt-BR", { numeric: true }));
@@ -63,7 +63,7 @@ export default function KnockoutBracketPreview({ categoryName, matches = [] }: {
               <p className="mb-3 text-[10px] font-extrabold uppercase tracking-widest text-cream/50">{phaseLabel(phase)}</p>
               <div className="flex flex-1 flex-col justify-around gap-5">
                 {rows.map((match) => (
-                  <MatchNode key={match.id} match={match} withConnector={phase !== "Final" && phase !== "Disputa de 3º lugar"} />
+                  <MatchNode key={match.id} match={match} onEdit={onEdit} withConnector={phase !== "Final" && phase !== "Disputa de 3º lugar"} />
                 ))}
               </div>
             </div>
