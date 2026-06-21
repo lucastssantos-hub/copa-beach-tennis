@@ -39,7 +39,7 @@ function MatchNode({ match, withConnector }: { match: Match; withConnector: bool
   );
 }
 
-export default function KnockoutBracketPreview({ categoryName, matches }: { categoryName: string | null; matches: Match[] }) {
+export default function KnockoutBracketPreview({ categoryName, matches = [] }: { categoryName: string | null; matches?: Match[] }) {
   const knockout = matches
     .filter((match) => PHASES.includes(match.group_or_phase || ""))
     .sort((a, b) => phaseRank(a.group_or_phase) - phaseRank(b.group_or_phase) || (a.round || "").localeCompare(b.round || "", "pt-BR", { numeric: true }));

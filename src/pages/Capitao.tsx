@@ -804,7 +804,10 @@ function CaptainPanel({ team, onLogout }: { team: Team; onLogout: () => void }) 
         </div>
       )}
 
-      <KnockoutBracketPreview categoryName={category ?? (categories.includes("60+") ? "60+" : null)} />
+      <KnockoutBracketPreview
+        categoryName={category ?? (categories.includes("60+") ? "60+" : null)}
+        matches={filteredMatches}
+      />
 
       <section className="space-y-3">
         <h2 className="text-sm font-extrabold uppercase tracking-[0.18em] text-cream/70">
