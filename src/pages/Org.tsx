@@ -866,7 +866,10 @@ export default function Org() {
             <h2 className="text-lg font-extrabold text-branco-quente">
               Classificação{classCategory ? ` — Cat. ${classCategory}` : ""}
             </h2>
-            <KnockoutBracketPreview categoryName={classCategory} />
+            <KnockoutBracketPreview
+              categoryName={classCategory}
+              matches={matches.filter((m) => m.category_name === classCategory)}
+            />
             {classGroups.length === 0 ? (
               <EmptyState
                 icon="📊"
