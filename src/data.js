@@ -6,6 +6,7 @@ export const FLAGS = {
   ARG: "🇦🇷", ARU: "🇦🇼", AUS: "🇦🇺", BRA: "🇧🇷", CAN: "🇨🇦",
   ENG: "🏴󠁧󠁢󠁥󠁮󠁧󠁿", FRA: "🇫🇷", GER: "🇩🇪", ITA: "🇮🇹", JAM: "🇯🇲",
   NED: "🇳🇱", NOR: "🇳🇴", POR: "🇵🇹", SWE: "🇸🇪", USA: "🇺🇸",
+  CPV: "🇨🇻", ESP: "🇪🇸", PRY: "🇵🇾",
 };
 
 export const TEAM_CODE = "BRA";
@@ -16,7 +17,9 @@ const COUNTRY_NAMES = {
   AUS: "Austrália",
   BRA: "Brasil",
   CAN: "Canadá",
+  CPV: "Cabo Verde",
   ENG: "Inglaterra",
+  ESP: "Espanha",
   FRA: "França",
   GER: "Alemanha",
   ITA: "Itália",
@@ -24,16 +27,19 @@ const COUNTRY_NAMES = {
   NED: "Holanda",
   NOR: "Noruega",
   POR: "Portugal",
+  PRY: "Paraguai",
   SWE: "Suécia",
   USA: "USA",
 };
 
 // Capitão de cada seleção neste evento
 const CAPTAIN_NAMES = {
-  USA: "Jadson",   BRA: "Eudes",     ITA: "Casimiro", ARG: "Vitor",
-  POR: "David",    SWE: "Erick",     AUS: "Geovane",  NED: "Romulo",
-  ENG: "Eduardo",  CAN: "Vinão",     ARU: "Robinho",
+  USA: "Pedro",    BRA: "Renato",    ITA: "Casimiro", ARG: "Leonardo",
+  POR: "Maiara/Day", SWE: "Erick",    AUS: "Geovane",  NED: "Romulo",
+  ENG: "Eduardo",  CAN: "Vinão",     ARU: "Gabriel",
   FRA: "Henrique", JAM: "Martinelli",NOR: "Cláudia",  GER: "André",
+  CPV: "Gustavo", ESP: "José Ricardo", PRY: "Dani/Mari",
+  NOR: "Pedro",
 };
 
 function makeRoster(code) {
