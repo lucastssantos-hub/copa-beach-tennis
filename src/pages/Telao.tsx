@@ -5,6 +5,7 @@ import MatchCard from "../components/MatchCard";
 import EmptyState from "../components/EmptyState";
 import StatusPill from "../components/StatusPill";
 import StandingsTable from "../components/StandingsTable";
+import PublicNav from "../components/PublicNav";
 import { useTable } from "../lib/useTable";
 import { isGroupPhase } from "../lib/engine";
 import { CATEGORY_CHIPS } from "../lib/types";
@@ -56,7 +57,7 @@ export default function Telao() {
     : [];
 
   return (
-    <AppShell>
+    <AppShell withBottomNav>
       <Header title="Telão ao Vivo" backTo="/" />
 
       <Section title="Quadras ao Vivo">
@@ -137,6 +138,7 @@ export default function Telao() {
           <EmptyState icon="📊" title="Classificação indisponível" message="A classificação aparecerá quando os confrontos de grupos estiverem cadastrados." />
         )}
       </Section>
+      <PublicNav />
     </AppShell>
   );
 }

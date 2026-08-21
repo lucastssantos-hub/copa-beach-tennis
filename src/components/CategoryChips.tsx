@@ -11,7 +11,8 @@ export default function CategoryChips({ categories, selected, onSelect, allLabel
       {allLabel && (
         <button
           onClick={() => onSelect(null)}
-          className={`shrink-0 rounded-full border px-4 py-2 text-xs font-extrabold uppercase tracking-wide transition ${
+          aria-pressed={selected === null}
+          className={`min-h-11 shrink-0 rounded-full border px-4 py-2 text-xs font-extrabold uppercase tracking-wide transition ${
             selected === null
               ? "border-coral bg-coral text-branco-quente shadow-[0_4px_16px_rgba(255,90,78,0.4)]"
               : "border-white/15 bg-white/5 text-cream/80"
@@ -26,7 +27,8 @@ export default function CategoryChips({ categories, selected, onSelect, allLabel
           <button
             key={cat}
             onClick={() => onSelect(active ? null : cat)}
-            className={`shrink-0 rounded-full border px-4 py-2 text-xs font-extrabold uppercase tracking-wide transition ${
+            aria-pressed={active}
+            className={`min-h-11 shrink-0 rounded-full border px-4 py-2 text-xs font-extrabold uppercase tracking-wide transition ${
               active
                 ? "border-coral bg-coral text-branco-quente shadow-[0_4px_16px_rgba(255,90,78,0.4)]"
                 : "border-white/15 bg-white/5 text-cream/80"

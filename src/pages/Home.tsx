@@ -1,8 +1,15 @@
 import { Link } from "react-router-dom";
 import AppShell from "../components/AppShell";
+import PublicNav from "../components/PublicNav";
 import { supabaseConfigured } from "../lib/supabase";
 
 const links = [
+  {
+    to: "/inscritos",
+    icon: "👥",
+    title: "Inscritos",
+    desc: "Atletas por seleção e categoria",
+  },
   {
     to: "/org",
     icon: "🛠️",
@@ -25,7 +32,7 @@ const links = [
 
 export default function Home() {
   return (
-    <AppShell>
+    <AppShell withBottomNav>
       <div className="flex flex-1 flex-col justify-center px-5 py-10">
         <div className="mb-10 text-center">
           <p className="mb-2 text-xs font-extrabold uppercase tracking-[0.3em] text-coral">
@@ -64,6 +71,7 @@ export default function Home() {
           </p>
         )}
       </div>
+      <PublicNav />
     </AppShell>
   );
 }
