@@ -38,7 +38,7 @@ create table if not exists categories (
 );
 
 insert into categories (category_name)
-select c from (values ('A'), ('B'), ('C'), ('D'), ('E'), ('35+'), ('60+')) as v(c)
+select c from (values ('A'), ('B'), ('C'), ('D'), ('E'), ('40+'), ('60+')) as v(c)
 where not exists (select 1 from categories where category_name = v.c);
 
 -- ------------------------------------------------------------

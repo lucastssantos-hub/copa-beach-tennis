@@ -174,4 +174,4 @@ export interface AuditLog {
 }
 
 // Ordem oficial dos chips no painel da organização.
-export const CATEGORY_CHIPS = ["60+", "E", "35+", "D", "C", "B", "A"];
+export const CATEGORY_CHIPS = ["60+", "40+", "E", "D", "C", "B", "A"];

@@ -43,13 +43,13 @@ export function getCanonicalCountries() {
   return CANONICAL_COUNTRIES;
 }
 
-const VALID_CATEGORIES = new Set(["A", "B", "C", "D", "E", "35+", "60+"]);
+const VALID_CATEGORIES = new Set(["A", "B", "C", "D", "E", "40+", "60+"]);
 
 /** Retorna a categoria normalizada, ou null se inválida. */
 export function normalizeCategory(raw: string): string | null {
   const t = raw.trim().toUpperCase();
   // aceitar "35" ou "60" sem o "+"
-  if (t === "35") return "35+";
+  if (t === "40") return "40+";
   if (t === "60") return "60+";
   return VALID_CATEGORIES.has(t) ? t : null;
 }
