@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import AppShell from "../components/AppShell";
+import CategoryChips from "../components/CategoryChips";
 import EmptyState from "../components/EmptyState";
 import Header from "../components/Header";
 import PublicNav from "../components/PublicNav";
-import type { Athlete, Team } from "../lib/types";
+import { CATEGORY_CHIPS, type Athlete, type AthleteRegistration, type Team } from "../lib/types";
 import { useTable } from "../lib/useTable";
 
 function normalize(value: string) {
@@ -11,6 +12,7 @@ function normalize(value: string) {
 }
 
 export default function Inscritos() {
+  const [category, setCategory] = useState<string | null>(null);
   const [teamId, setTeamId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const { data: teams, loading: teamsLoading, error: teamsError } = useTable<Team>("teams", {
@@ -23,6 +25,21 @@ export default function Inscritos() {
     ascending: true,
     pollMs: 120000,
   });
+  const { data: registrations, loading: registrationsLoading, error: registrationsError } = useTable<AthleteRegistration>("athlete_registrations", {
+    orderBy: "created_at",
+    ascending: true,
+    pollMs: 120000,
+  });
+
+  const categoriesByAthlete = useMemo(() => {
+    const map = new Map<string, string[]>();
+    registrations.forEach((registration) => {
+      const current = map.get(registration.athlete_id) ?? [];
+      current.push(registration.category_name);
+      map.set(registration.athlete_id, current);
+    });
+    return map;
+  }, [registrations]);
 
   const visibleTeams = useMemo(() => {
     const term = normalize(search.trim());
@@ -30,17 +47,22 @@ export default function Inscritos() {
       .map((team) => {
         const roster = athletes.filter((athlete) => {
           const belongsToTeam = athlete.team_id === team.id || athlete.team_name === team.team_name;
+          const belongsToCategory = !category || categoriesByAthlete.get(athlete.id)?.includes(category);
           const matchesSearch = !term || normalize(athlete.athlete_name).includes(term);
-          return belongsToTeam && matchesSearch;
+          return belongsToTeam && belongsToCategory && matchesSearch;
         });
         return { team, roster };
       })
       .filter(({ team, roster }) => (!teamId || team.id === teamId) && roster.length > 0);
-  }, [athletes, search, teamId, teams]);
+  }, [athletes, categoriesByAthlete, category, search, teamId, teams]);
 
   const visibleCount = visibleTeams.reduce((total, item) => total + item.roster.length, 0);
-  const loading = teamsLoading || athletesLoading;
-  const error = teamsError || athletesError;
+  const visibleAthleteIds = new Set(visibleTeams.flatMap((item) => item.roster.map((athlete) => athlete.id)));
+  const visibleRegistrationCount = registrations.filter((registration) =>
+    visibleAthleteIds.has(registration.athlete_id) && (!category || registration.category_name === category),
+  ).length;
+  const loading = teamsLoading || athletesLoading || registrationsLoading;
+  const error = teamsError || athletesError || registrationsError;
 
   return (
     <AppShell width="wide" withBottomNav>
@@ -48,6 +70,8 @@ export default function Inscritos() {
 
       <main className="flex-1 pb-10">
         <section aria-label="Filtros dos inscritos" className="space-y-4">
+          <CategoryChips categories={CATEGORY_CHIPS} selected={category} onSelect={setCategory} allLabel="Todas" />
+
           <div className="flex gap-2 overflow-x-auto px-5 pb-1" aria-label="Filtrar por seleção">
             <button
               type="button"
@@ -94,7 +118,11 @@ export default function Inscritos() {
               {loading ? "Carregando" : `${visibleCount} atletas`}
             </h2>
           </div>
-          {!loading && <p className="text-xs font-bold text-cream/60">{visibleTeams.length} seleções</p>}
+          {!loading && (
+            <p className="text-right text-xs font-bold leading-relaxed text-cream/60">
+              {visibleRegistrationCount} inscrições<br />{visibleTeams.length} seleções
+            </p>
+          )}
         </div>
 
         <section className="mt-4 space-y-4 px-5" aria-live="polite">
@@ -125,6 +153,13 @@ export default function Inscritos() {
                         {athlete.gender === "Feminino" ? "F" : "M"}
                       </span>
                       <span className="min-w-0 flex-1 text-sm font-bold leading-snug text-branco-quente">{athlete.athlete_name}</span>
+                      <span className="flex max-w-[45%] flex-wrap justify-end gap-1">
+                        {(categoriesByAthlete.get(athlete.id) ?? []).map((athleteCategory) => (
+                          <span key={athleteCategory} className="rounded-full bg-white/[0.08] px-2 py-1 text-[10px] font-extrabold text-cream/80">
+                            {athleteCategory}
+                          </span>
+                        ))}
+                      </span>
                       <span className="sr-only">{athlete.gender}</span>
                     </li>
                   ))}

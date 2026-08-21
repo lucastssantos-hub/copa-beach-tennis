@@ -54,6 +54,22 @@ create table if not exists athletes (
   updated_at timestamp default now()
 );
 
+-- Inscrições dos atletas por categoria (uma pessoa pode disputar mais de uma).
+create table if not exists athlete_registrations (
+  id uuid primary key default gen_random_uuid(),
+  athlete_id uuid not null references athletes(id) on delete cascade,
+  team_id uuid references teams(id) on delete cascade,
+  team_name text not null,
+  category_name text not null check (category_name in ('60+', '40+', 'E', 'D', 'C', 'B', 'A')),
+  letzplay_profile text,
+  created_at timestamp default now(),
+  updated_at timestamp default now(),
+  unique (athlete_id, category_name)
+);
+
+create index if not exists athlete_registrations_team_category_idx
+  on athlete_registrations (team_id, category_name);
+
 -- ------------------------------------------------------------
 -- Confrontos
 -- ------------------------------------------------------------
@@ -208,7 +224,7 @@ create table if not exists audit_logs (
 do $$
 declare t text;
 begin
-  foreach t in array array['teams','categories','athletes','matches','lineups','presence','courts','results','notifications','audit_logs']
+  foreach t in array array['teams','categories','athletes','athlete_registrations','matches','lineups','presence','courts','results','notifications','audit_logs']
   loop
     execute format('alter table %I enable row level security', t);
     if not exists (

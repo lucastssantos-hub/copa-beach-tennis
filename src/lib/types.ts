@@ -22,6 +22,17 @@ export interface Athlete {
   updated_at: string;
 }
 
+export interface AthleteRegistration {
+  id: string;
+  athlete_id: string;
+  team_id: string | null;
+  team_name: string;
+  category_name: string;
+  letzplay_profile: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Category {
   id: string;
   category_name: string;
