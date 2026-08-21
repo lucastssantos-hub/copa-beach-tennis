@@ -149,10 +149,10 @@ create table if not exists courts (
   updated_at timestamp default now()
 );
 
--- Quadras 1 a 10: Livre | Quadras 11 a 13: Escape
+-- Quadras 1 a 7: Livre
 insert into courts (court_number, court_status)
-select n, case when n <= 10 then 'Livre' else 'Escape' end
-from generate_series(1, 13) as n
+select n, 'Livre'
+from generate_series(1, 7) as n
 where not exists (select 1 from courts where court_number = n);
 
 -- ------------------------------------------------------------

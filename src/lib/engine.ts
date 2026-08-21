@@ -625,9 +625,9 @@ export function courtLabel(c: Court): string {
   return `Quadra ${c.court_number}`;
 }
 
-/** Status original de uma quadra ao ser liberada (11–13 são Escape). */
+/** Status original de uma quadra ao ser liberada. */
 export function idleCourtStatus(c: Court): string {
-  return c.court_number > 10 ? "Escape" : "Livre";
+  return "Livre";
 }
 
 export function matchLabel(m: Match): string {

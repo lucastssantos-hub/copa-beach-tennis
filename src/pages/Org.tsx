@@ -702,7 +702,7 @@ export default function Org() {
                 <EmptyState
                   icon="🎾"
                   title="Nenhuma quadra cadastrada"
-                  message="Rode o schema.sql no Supabase para criar as 13 quadras."
+                  message="Rode o schema.sql no Supabase para criar as 7 quadras."
                 />
               ) : (
                 <CourtGridCompact courts={courts} />

@@ -61,7 +61,7 @@ export default function Telao() {
 
       <Section title="Quadras ao Vivo">
         {courts.length === 0 ? (
-          <EmptyState icon="🎾" title="Nenhuma quadra cadastrada" message="Rode o schema.sql no Supabase para criar as 13 quadras." />
+          <EmptyState icon="🎾" title="Nenhuma quadra cadastrada" message="Rode o schema.sql no Supabase para criar as 7 quadras." />
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {courts.map((c) => (
