@@ -1,10 +1,9 @@
 import { useMemo, useState } from "react";
 import AppShell from "../components/AppShell";
-import CategoryChips from "../components/CategoryChips";
 import EmptyState from "../components/EmptyState";
 import Header from "../components/Header";
 import PublicNav from "../components/PublicNav";
-import { CATEGORY_CHIPS, type Athlete, type Team } from "../lib/types";
+import type { Athlete, Team } from "../lib/types";
 import { useTable } from "../lib/useTable";
 
 function normalize(value: string) {
@@ -12,7 +11,6 @@ function normalize(value: string) {
 }
 
 export default function Inscritos() {
-  const [category, setCategory] = useState<string | null>(null);
   const [teamId, setTeamId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const { data: teams, loading: teamsLoading, error: teamsError } = useTable<Team>("teams", {
@@ -32,14 +30,13 @@ export default function Inscritos() {
       .map((team) => {
         const roster = athletes.filter((athlete) => {
           const belongsToTeam = athlete.team_id === team.id || athlete.team_name === team.team_name;
-          const belongsToCategory = !category || athlete.category_name === category;
           const matchesSearch = !term || normalize(athlete.athlete_name).includes(term);
-          return belongsToTeam && belongsToCategory && matchesSearch;
+          return belongsToTeam && matchesSearch;
         });
         return { team, roster };
       })
       .filter(({ team, roster }) => (!teamId || team.id === teamId) && roster.length > 0);
-  }, [athletes, category, search, teamId, teams]);
+  }, [athletes, search, teamId, teams]);
 
   const visibleCount = visibleTeams.reduce((total, item) => total + item.roster.length, 0);
   const loading = teamsLoading || athletesLoading;
@@ -51,8 +48,6 @@ export default function Inscritos() {
 
       <main className="flex-1 pb-10">
         <section aria-label="Filtros dos inscritos" className="space-y-4">
-          <CategoryChips categories={CATEGORY_CHIPS} selected={category} onSelect={setCategory} allLabel="Todas" />
-
           <div className="flex gap-2 overflow-x-auto px-5 pb-1" aria-label="Filtrar por seleção">
             <button
               type="button"
@@ -130,9 +125,6 @@ export default function Inscritos() {
                         {athlete.gender === "Feminino" ? "F" : "M"}
                       </span>
                       <span className="min-w-0 flex-1 text-sm font-bold leading-snug text-branco-quente">{athlete.athlete_name}</span>
-                      <span className="rounded-full bg-white/[0.08] px-2.5 py-1 text-[11px] font-extrabold text-cream/80">
-                        {athlete.category_name || "—"}
-                      </span>
                       <span className="sr-only">{athlete.gender}</span>
                     </li>
                   ))}

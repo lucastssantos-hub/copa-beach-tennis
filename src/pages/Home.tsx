@@ -8,7 +8,7 @@ const links = [
     to: "/inscritos",
     icon: "👥",
     title: "Inscritos",
-    desc: "Atletas por seleção e categoria",
+    desc: "Atletas por seleção",
   },
   {
     to: "/org",
