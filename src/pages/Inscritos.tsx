@@ -77,7 +77,7 @@ export default function Inscritos() {
               type="button"
               onClick={() => setTeamId(null)}
               aria-pressed={teamId === null}
-              className={`shrink-0 rounded-full border px-4 py-2 text-xs font-extrabold transition ${
+              className={`min-h-11 shrink-0 rounded-full border px-4 py-2 text-xs font-extrabold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral ${
                 teamId === null ? "border-cream bg-cream text-roxo-escuro" : "border-white/15 bg-white/5 text-cream/80"
               }`}
             >
@@ -89,7 +89,7 @@ export default function Inscritos() {
                 type="button"
                 onClick={() => setTeamId(teamId === team.id ? null : team.id)}
                 aria-pressed={teamId === team.id}
-                className={`shrink-0 rounded-full border px-4 py-2 text-xs font-extrabold transition ${
+                className={`min-h-11 shrink-0 rounded-full border px-4 py-2 text-xs font-extrabold transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-coral ${
                   teamId === team.id ? "border-cream bg-cream text-roxo-escuro" : "border-white/15 bg-white/5 text-cream/80"
                 }`}
               >
@@ -111,21 +111,22 @@ export default function Inscritos() {
           </div>
         </section>
 
-        <div className="mt-7 flex items-end justify-between px-5">
+        <div className="mt-7 flex items-end justify-between px-5" aria-live="polite">
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-coral">Lista oficial</p>
             <h2 className="mt-1 font-display text-2xl uppercase text-branco-quente">
-              {loading ? "Carregando" : `${visibleCount} atletas`}
+              {loading ? "Carregando" : `${visibleCount} ${visibleCount === 1 ? "atleta" : "atletas"}`}
             </h2>
           </div>
           {!loading && (
             <p className="text-right text-xs font-bold leading-relaxed text-cream/60">
-              {visibleRegistrationCount} inscrições<br />{visibleTeams.length} seleções
+              {visibleRegistrationCount} {visibleRegistrationCount === 1 ? "inscrição" : "inscrições"}<br />
+              {visibleTeams.length} {visibleTeams.length === 1 ? "seleção" : "seleções"}
             </p>
           )}
         </div>
 
-        <section className="mt-4 space-y-4 px-5" aria-live="polite">
+        <section className="mt-4 space-y-4 px-5">
           {error ? (
             <EmptyState icon="⚠️" title="Não foi possível carregar os inscritos" message="Atualize a página e tente novamente." />
           ) : loading ? (
