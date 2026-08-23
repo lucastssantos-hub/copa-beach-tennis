@@ -287,8 +287,9 @@ as $$
   select t.*
   from public.teams t
   join public.team_access ta on ta.team_code = t.abbreviation
-  where ta.access_code = btrim(p_code)
-    and (t.team_name ilike '%' || btrim(p_query) || '%'
+  where lower(ta.access_code) = lower(btrim(p_code))
+    and (lower(btrim(t.abbreviation)) = lower(btrim(p_query))
+         or t.team_name ilike '%' || btrim(p_query) || '%'
          or t.country ilike '%' || btrim(p_query) || '%')
   limit 1;
 $$;
