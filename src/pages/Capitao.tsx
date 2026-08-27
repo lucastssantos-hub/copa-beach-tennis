@@ -24,7 +24,7 @@ import {
   teamSide,
   winnerSide,
 } from "../lib/engine";
-import { CATEGORY_CHIPS, type Athlete, type Lineup, type Match, type Presence, type Result, type Team } from "../lib/types";
+import { CATEGORY_CHIPS, type Athlete, type AthleteRegistration, type Lineup, type Match, type Presence, type Result, type Team } from "../lib/types";
 import { normalizeGender } from "../lib/normalize";
 
 const SESSION_KEY = "copa-capitao-team";
@@ -606,6 +606,7 @@ function CaptainPanel({ team, onLogout }: { team: Team; onLogout: () => void }) 
   const { data: presence, refresh: refreshPresence } = useTable<Presence>("presence", { pollMs: 15000 });
   const { data: results, refresh: refreshResults } = useTable<Result>("results", { pollMs: 15000 });
   const { data: athletes } = useTable<Athlete>("athletes", { pollMs: 60000 });
+  const { data: athleteRegistrations } = useTable<AthleteRegistration>("athlete_registrations", { pollMs: 60000 });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [category, setCategory] = useState<string | null>(null);
   const [warmup, setWarmup] = useState<Warmup | null>(loadWarmup);
@@ -696,19 +697,25 @@ function CaptainPanel({ team, onLogout }: { team: Team; onLogout: () => void }) 
               presence={presence}
               results={results}
               athletes={(() => {
-                // Filtro primário: mesma equipe + mesma categoria (ou sem categoria)
-                const catFiltered = athletes.filter(
-                  (a) =>
-                    (a.team_id === team.id || a.team_name === team.team_name) &&
-                    (a.category_name === selected.category_name || !a.category_name),
+                if (!selected.category_name) return [];
+
+                // A categoria oficial de cada atleta vive em athlete_registrations.
+                // O elenco base não tem categoria e, portanto, não pode ser usado
+                // como fallback sem misturar inscritos de outras categorias.
+                const registeredAthleteIds = new Set(
+                  athleteRegistrations
+                    .filter(
+                      (registration) =>
+                        registration.category_name === selected.category_name &&
+                        (registration.team_id === team.id || registration.team_name === team.team_name),
+                    )
+                    .map((registration) => registration.athlete_id),
                 );
-                // Fallback: se não há atletas suficientes (mínimo 4: 2 fem + 2 masc),
-                // mostra todos os atletas da equipe independente de categoria.
-                // Necessário quando atletas estão cadastrados em categoria diferente
-                // do confronto (ex: França Cat:C jogando confronto 60+).
-                if (catFiltered.length >= 4) return catFiltered;
+
                 return athletes.filter(
-                  (a) => a.team_id === team.id || a.team_name === team.team_name,
+                  (athlete) =>
+                    registeredAthleteIds.has(athlete.id) &&
+                    (athlete.team_id === team.id || athlete.team_name === team.team_name),
                 );
               })()}
               onBack={() => setSelectedId(null)}
