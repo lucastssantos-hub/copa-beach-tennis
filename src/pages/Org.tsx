@@ -15,7 +15,7 @@ import StandingsTable from "../components/StandingsTable";
 import LetzplayPanel from "../components/LetzplayPanel";
 import { useTable } from "../lib/useTable";
 import { supabase, supabaseConfigured } from "../lib/supabase";
-import { createAuditLog } from "../lib/actions";
+import { createAuditLog, createNotification } from "../lib/actions";
 import { READINESS_BUCKETS, isGroupPhase, readinessBucket, type ReadinessBucket } from "../lib/engine";
 import {
   CATEGORY_CHIPS,
@@ -386,6 +386,18 @@ function BracketMatchEditor({ match, teams, onClose, onSaved }: { match: Match; 
     }).eq("id", match.id);
     setSaving(false);
     if (err) return setError(err.message);
+    // "Aguardando escalação" já libera o envio no app do capitão; a notificação
+    // é o aviso para ele não depender de abrir o app por acaso.
+    const fase = match.round ?? match.group_or_phase ?? "chave";
+    for (const equipe of [a, b]) {
+      await createNotification({
+        notification_type: "chave",
+        message: `🔑 ${equipe.team_name} está em ${fase} (Cat. ${match.category_name}) — envie a escalação`,
+        team_id: equipe.id,
+        team_name: equipe.team_name,
+        match_id: match.id,
+      });
+    }
     await createAuditLog({ actor: "ORG", action: "DEFINIR_CHAVE", entity: "matches", details: `${a.team_name} x ${b.team_name} — ${match.category_name} ${match.group_or_phase} ${match.round}` });
     onSaved();
     onClose();

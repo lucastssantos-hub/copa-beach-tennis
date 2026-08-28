@@ -16,8 +16,10 @@ import {
   type LineupPlayers,
 } from "../lib/actions";
 import {
+  isKnockoutPhase,
   isTerminal,
   needsMista,
+  parsePendingSlotName,
   resultsFor,
   sideLineup,
   sideTeamName,
@@ -141,6 +143,8 @@ function CaptainLogin({ onLogin }: LoginProps) {
 // hora · quadra, equipes lado a lado com "vs" no meio.
 // ---------------------------------------------------------------------------
 function CaptainMatchCard({ match, onClick }: { match: Match; onClick: () => void }) {
+  const pendingA = !!parsePendingSlotName(match.team_a_name);
+  const pendingB = !!parsePendingSlotName(match.team_b_name);
   return (
     <div
       onClick={onClick}
@@ -163,22 +167,22 @@ function CaptainMatchCard({ match, onClick }: { match: Match; onClick: () => voi
         <div className="flex min-w-0 flex-1 items-center gap-2.5">
           <span className="text-2xl leading-none">{match.team_a_flag || "🏳️"}</span>
           <div className="min-w-0">
-            <p className="font-mono text-base font-extrabold leading-tight text-branco-quente">
+            <p className={`font-mono text-base font-extrabold leading-tight ${pendingA ? "text-amber-300" : "text-branco-quente"}`}>
               {match.team_a_abbreviation || "—"}
             </p>
             <p className="truncate text-[10px] font-bold uppercase tracking-wider text-cream/50">
-              {match.team_a_name || "A definir"}
+              {pendingA ? "A definir" : match.team_a_name || "A definir"}
             </p>
           </div>
         </div>
         <span className="text-[10px] font-extrabold uppercase tracking-widest text-cream/40">vs</span>
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2.5 text-right">
           <div className="min-w-0">
-            <p className="font-mono text-base font-extrabold leading-tight text-branco-quente">
+            <p className={`font-mono text-base font-extrabold leading-tight ${pendingB ? "text-amber-300" : "text-branco-quente"}`}>
               {match.team_b_abbreviation || "—"}
             </p>
             <p className="truncate text-[10px] font-bold uppercase tracking-wider text-cream/50">
-              {match.team_b_name || "A definir"}
+              {pendingB ? "A definir" : match.team_b_name || "A definir"}
             </p>
           </div>
           <span className="text-2xl leading-none">{match.team_b_flag || "🏳️"}</span>
@@ -292,6 +296,9 @@ function CaptainMatchView({
   onSent: () => void;
 }) {
   const side = teamSide(match, team);
+  const opponentPending = side
+    ? parsePendingSlotName(side === "a" ? match.team_b_name : match.team_a_name)
+    : null;
   const myLineup = side ? sideLineup(match, lineups, side) : null;
   const submitted = myLineup?.lineup_status === "Enviada";
   const games = resultsFor(match, results);
@@ -439,6 +446,19 @@ function CaptainMatchView({
           </div>
         </div>
       </div>
+
+      {/* Chave adiantada: adversário ainda indefinido, mas a escalação já vale */}
+      {opponentPending && !terminal && (
+        <div className="rounded-3xl border border-amber-300/30 bg-amber-300/10 p-4">
+          <p className="text-sm font-extrabold text-amber-200">
+            Adversário a definir — {opponentPending.seedLabel}
+          </p>
+          <p className="mt-1 text-xs font-semibold text-cream/70">
+            Sua vaga nesta fase já está garantida. Pode enviar a escalação agora: ela não muda quando
+            a organização definir o adversário.
+          </p>
+        </div>
+      )}
 
       {/* Pós-envio: quadra definida sem validação manual da organização */}
       {locked && !terminal && !contested && (
@@ -663,6 +683,20 @@ function CaptainPanel({ team, onLogout }: { team: Team; onLogout: () => void }) 
     });
   }, [teamMatches]);
   const filteredMatches = category ? teamMatches.filter((m) => m.category_name === category) : teamMatches;
+  // Chave: sempre de UMA categoria. Sem chip selecionado, usa a primeira
+  // categoria da equipe que já tenha confronto eliminatório criado.
+  const bracketCategory = useMemo(() => {
+    if (category) return category;
+    return (
+      categories.find((c) =>
+        teamMatches.some((m) => m.category_name === c && isKnockoutPhase(m.group_or_phase)),
+      ) ?? null
+    );
+  }, [category, categories, teamMatches]);
+  const bracketMatches = useMemo(
+    () => teamMatches.filter((m) => m.category_name === bracketCategory),
+    [teamMatches, bracketCategory],
+  );
   const ativos = filteredMatches.filter((m) => !isTerminal(m.match_status));
   const historico = filteredMatches.filter((m) => isTerminal(m.match_status));
   // O confronto vem da lista viva (polling) — a quadra aparece assim que o ADM liberar.
@@ -811,10 +845,7 @@ function CaptainPanel({ team, onLogout }: { team: Team; onLogout: () => void }) 
         </div>
       )}
 
-      <KnockoutBracketPreview
-        categoryName={category ?? (categories.includes("60+") ? "60+" : null)}
-        matches={filteredMatches}
-      />
+      <KnockoutBracketPreview categoryName={bracketCategory} matches={bracketMatches} />
 
       <section className="space-y-3">
         <h2 className="text-sm font-extrabold uppercase tracking-[0.18em] text-cream/70">

@@ -12,6 +12,7 @@ import {
   sideTeamId,
   sideTeamName,
   type GameType,
+  type KnockoutFillRow,
 } from "./engine";
 import type { Court, Match, MatchStatus, Result, Team } from "./types";
 
@@ -570,6 +571,55 @@ export async function insertGeneratedMatches(
     action: "GERAR_CHAVES",
     entity: "matches",
     details: `Categoria ${categoryName}: ${rows.length} confrontos gerados`,
+  });
+  return null;
+}
+
+/**
+ * Preenche as vagas em aberto de uma chave adiantada (ex.: a semifinal criada
+ * enquanto um grupo ainda jogava). Escreve só o lado pendente — o lado já
+ * definido, e a escalação que o capitão porventura já enviou, ficam intactos.
+ */
+export async function applyKnockoutFill(
+  rows: KnockoutFillRow[],
+  categoryName: string,
+  actor = "ORG",
+): Promise<string | null> {
+  if (!supabase || rows.length === 0) return null;
+  // Duas vagas podem cair no mesmo confronto: junta os patches por partida.
+  const patches = new Map<string, Record<string, unknown>>();
+  const labels: string[] = [];
+  for (const row of rows) {
+    const patch = patches.get(row.match.id) ?? { updated_at: now() };
+    const prefix = row.side === "a" ? "team_a" : "team_b";
+    patch[`${prefix}_id`] = row.slot.id;
+    patch[`${prefix}_name`] = row.slot.name;
+    patch[`${prefix}_abbreviation`] = row.slot.abbreviation;
+    patch[`${prefix}_flag`] = row.slot.flag;
+    patches.set(row.match.id, patch);
+    labels.push(`${row.seedLabel} → ${row.slot.name} (${row.match.round ?? row.match.group_or_phase})`);
+  }
+
+  for (const [matchId, patch] of patches) {
+    const { error } = await supabase.from("matches").update(patch).eq("id", matchId);
+    if (error) return error.message;
+  }
+
+  for (const row of rows) {
+    await createNotification({
+      notification_type: "chave",
+      message: `🔑 ${row.slot.name} está em ${row.match.round ?? row.match.group_or_phase} (Cat. ${categoryName}) — envie a escalação`,
+      team_id: row.slot.id,
+      team_name: row.slot.name,
+      match_id: row.match.id,
+    });
+  }
+
+  await createAuditLog({
+    actor,
+    action: "PREENCHER_VAGAS_CHAVE",
+    entity: "matches",
+    details: `Categoria ${categoryName}: ${labels.join(" · ")}`,
   });
   return null;
 }

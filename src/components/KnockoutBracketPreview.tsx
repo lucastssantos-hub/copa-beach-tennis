@@ -1,3 +1,4 @@
+import { parsePendingSlotName } from "../lib/engine";
 import type { Match } from "../lib/types";
 
 const PHASES = ["Oitavas de final", "Quartas de final", "Semifinal", "Disputa de 3º lugar", "Final"];
@@ -11,7 +12,14 @@ function teamLabel(match: Match, side: "a" | "b") {
   const name = side === "a" ? match.team_a_name : match.team_b_name;
   const flag = side === "a" ? match.team_a_flag : match.team_b_flag;
   const abbreviation = side === "a" ? match.team_a_abbreviation : match.team_b_abbreviation;
+  // Vaga adiantada: mostra de onde ela vem ("1º Grupo 1"), não uma bandeira vazia.
+  const pending = parsePendingSlotName(name);
+  if (pending) return `A definir · ${pending.seedLabel}`;
   return name ? `${flag || "🏳️"} ${abbreviation || name}` : "A definir";
+}
+
+function isPending(match: Match, side: "a" | "b") {
+  return !!parsePendingSlotName(side === "a" ? match.team_a_name : match.team_b_name);
 }
 
 function phaseLabel(phase: string) {
@@ -29,8 +37,8 @@ function MatchNode({ match, withConnector, onEdit }: { match: Match; withConnect
         <p className="border-b border-white/10 px-3 py-1.5 text-[9px] font-extrabold uppercase tracking-wider text-coral">
           {match.round || match.group_or_phase}
         </p>
-        <p className="border-b border-white/10 px-3 py-2 text-xs font-extrabold text-branco-quente">{teamLabel(match, "a")}</p>
-        <p className="px-3 py-2 text-xs font-extrabold text-branco-quente">{teamLabel(match, "b")}</p>
+        <p className={`border-b border-white/10 px-3 py-2 text-xs font-extrabold ${isPending(match, "a") ? "text-amber-300" : "text-branco-quente"}`}>{teamLabel(match, "a")}</p>
+        <p className={`px-3 py-2 text-xs font-extrabold ${isPending(match, "b") ? "text-amber-300" : "text-branco-quente"}`}>{teamLabel(match, "b")}</p>
       </div>
       {withConnector && (
         <span aria-hidden="true" className="absolute left-full top-1/2 h-px w-6 bg-cream/35" />

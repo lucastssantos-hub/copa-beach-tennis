@@ -289,7 +289,92 @@ export interface TeamSlot {
   abbreviation: string | null;
   flag: string | null;
   seedLabel?: string;
+  /** Vaga ainda não definida (grupo em andamento) — vira placeholder no banco. */
+  pending?: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// Vagas em aberto ("adiantar" a chave com os grupos já fechados)
+// ---------------------------------------------------------------------------
+// Um confronto eliminatório pode ser criado antes de todos os grupos fecharem:
+// o lado já definido recebe a equipe real (o capitão já escala) e o lado
+// pendente guarda a vaga como texto — "A definir · 1º Grupo 1" — com id, sigla
+// curta e bandeira nulos. O texto é o que permite reabrir a chave depois e
+// preencher a vaga automaticamente (buildKnockoutFillPlan).
+export const PENDING_SLOT_PREFIX = "A definir";
+
+export function pendingSlotName(seedLabel: string): string {
+  return `${PENDING_SLOT_PREFIX} · ${seedLabel}`;
+}
+
+export function isPendingSlotName(name: string | null | undefined): boolean {
+  return (name ?? "").startsWith(`${PENDING_SLOT_PREFIX} ·`);
+}
+
+/**
+ * Duas origens possíveis para uma vaga em aberto:
+ *  - `grupo`   → "A definir · 1º Grupo 2"          (classificação de um grupo)
+ *  - `duelo`   → "A definir · Vencedor Semifinal 1" (avanço na própria chave)
+ */
+export type PendingSeed =
+  | { kind: "grupo"; group: string; position: number; seedLabel: string }
+  | { kind: "duelo"; round: string; side: "vencedor" | "perdedor"; seedLabel: string };
+
+export function parsePendingSlotName(name: string | null | undefined): PendingSeed | null {
+  if (!isPendingSlotName(name)) return null;
+  const seedLabel = (name ?? "").slice(PENDING_SLOT_PREFIX.length + 3).trim();
+
+  const duelo = seedLabel.match(/^(Vencedor|Perdedor)\s+(.+)$/i);
+  if (duelo) {
+    return {
+      kind: "duelo",
+      round: duelo[2].trim(),
+      side: duelo[1].toLowerCase() === "vencedor" ? "vencedor" : "perdedor",
+      seedLabel,
+    };
+  }
+
+  const grupo = seedLabel.match(/^(\d+)º\s+(.+)$/);
+  if (grupo) {
+    const position = Number(grupo[1]) - 1;
+    if (!Number.isInteger(position) || position < 0) return null;
+    return { kind: "grupo", group: grupo[2].trim(), position, seedLabel };
+  }
+
+  return null;
+}
+
+/** Sigla curta: "1º Grupo 2" → "1º G2"; "Vencedor Semifinal 1" → "Venc. SF1". */
+function pendingSlotAbbreviation(seedLabel: string): string {
+  return seedLabel
+    .replace(/Grupo\s+/i, "G")
+    .replace(/^Vencedor\s+/i, "Venc. ")
+    .replace(/^Perdedor\s+/i, "Perd. ")
+    .replace(/Semifinal\s+/i, "SF")
+    .replace(/Quartas\s+/i, "QF");
+}
+
+function slotFromSeedLabel(seedLabel: string): TeamSlot {
+  return {
+    id: null,
+    name: pendingSlotName(seedLabel),
+    abbreviation: pendingSlotAbbreviation(seedLabel),
+    flag: null,
+    seedLabel,
+    pending: true,
+  };
+}
+
+function pendingSlot(group: string, position: number): TeamSlot {
+  return slotFromSeedLabel(`${position + 1}º ${group}`);
+}
+
+/** Vaga que depende do resultado de um confronto da própria chave. */
+function pendingDueloSlot(match: Match, side: "vencedor" | "perdedor"): TeamSlot {
+  const round = match.round || match.group_or_phase || "confronto";
+  return slotFromSeedLabel(`${side === "vencedor" ? "Vencedor" : "Perdedor"} ${round}`);
+}
+
 
 export interface KnockoutMatchPlan {
   phase: KnockoutPhase;
@@ -302,6 +387,10 @@ export interface KnockoutPlan {
   label: string;
   reason: string | null;
   rows: KnockoutMatchPlan[];
+  /** Há vagas em aberto nas linhas geradas (grupo ainda em andamento). */
+  partial?: boolean;
+  /** Aviso a exibir junto da prévia quando a chave sai incompleta. */
+  note?: string | null;
 }
 
 export function isGroupPhase(value: string | null): value is string {
@@ -313,8 +402,8 @@ export function isKnockoutPhase(value: string | null): value is KnockoutPhase {
 }
 
 function groupNumber(value: string): number {
-  const [, n] = value.match(/\d+/) ?? [];
-  return Number(n) || 0;
+  // /\d+/ não tem grupo de captura: o número está no índice 0 do match.
+  return Number(value.match(/\d+/)?.[0]) || 0;
 }
 
 function sideSlot(match: Match, side: "a" | "b", seedLabel?: string): TeamSlot {
@@ -367,15 +456,46 @@ function loserSlot(match: Match, results: Result[], seedLabel?: string): TeamSlo
   return sideSlot(match, side === "a" ? "b" : "a", seedLabel);
 }
 
-export function buildInitialKnockoutPlan(categoryName: string, matches: Match[], results: Result[]): KnockoutPlan {
+export interface KnockoutPlanOptions {
+  /**
+   * Cria a chave mesmo com grupo em andamento: os grupos já fechados entram com
+   * as equipes reais (capitão escala desde já) e os demais viram vaga em aberto.
+   */
+  allowPartial?: boolean;
+  /**
+   * Cria a disputa de 3º lugar junto da final. Padrão: false — a chave desta
+   * Copa no LetzPlay é SF → Final → Campeão, sem 3º lugar, e o app não pode
+   * inventar um confronto que não existe lá.
+   */
+  thirdPlace?: boolean;
+}
+
+/** Classificação de cada grupo da categoria, na ordem Grupo 1, Grupo 2, … */
+function groupStandings(categoryMatches: Match[], results: Result[]) {
+  const groups = [...new Set(categoryMatches.map((m) => m.group_or_phase).filter(isGroupPhase))]
+    .sort((a, b) => groupNumber(a) - groupNumber(b));
+  return groups.map((group) => {
+    const groupMatches = categoryMatches.filter((m) => m.group_or_phase === group);
+    const allFinished = groupMatches.length > 0 && groupMatches.every((m) => isTerminal(m.match_status));
+    const standings = computeStandings(groupMatches, results);
+    return { group, groupMatches, allFinished, standings };
+  });
+}
+
+export function buildInitialKnockoutPlan(
+  categoryName: string,
+  matches: Match[],
+  results: Result[],
+  options: KnockoutPlanOptions = {},
+): KnockoutPlan {
   const categoryMatches = matches.filter((m) => m.category_name === categoryName);
   const knockoutExists = categoryMatches.some((m) => isKnockoutPhase(m.group_or_phase));
   if (knockoutExists) {
     return { label: "Eliminatórias já criadas", reason: "Esta categoria já tem confrontos eliminatórios.", rows: [] };
   }
 
-  const groups = [...new Set(categoryMatches.map((m) => m.group_or_phase).filter(isGroupPhase))]
-    .sort((a, b) => groupNumber(a) - groupNumber(b));
+  const standingsByGroup = groupStandings(categoryMatches, results);
+  const groups = standingsByGroup.map((g) => g.group);
   if (![1, 2, 4].includes(groups.length)) {
     return {
       label: "Aguardando grupos",
@@ -384,31 +504,43 @@ export function buildInitialKnockoutPlan(categoryName: string, matches: Match[],
     };
   }
 
-  const standingsByGroup = groups.map((group) => {
-    const groupMatches = categoryMatches.filter((m) => m.group_or_phase === group);
-    const allFinished = groupMatches.length > 0 && groupMatches.every((m) => isTerminal(m.match_status));
-    const standings = computeStandings(groupMatches, results);
-    return { group, groupMatches, allFinished, standings };
-  });
+  const isClosed = (g: (typeof standingsByGroup)[number]) => g.allFinished && g.standings.length >= 2;
+  const openGroups = standingsByGroup.filter((g) => !isClosed(g));
+  const partial = openGroups.length > 0;
 
-  const pendingGroup = standingsByGroup.find((g) => !g.allFinished || g.standings.length < 2);
-  if (pendingGroup) {
+  if (partial && !options.allowPartial) {
     return {
       label: "Aguardando grupos",
-      reason: `${pendingGroup.group} ainda não tem todos os confrontos finalizados com 2 classificados.`,
+      reason: `${openGroups[0].group} ainda não tem todos os confrontos finalizados com 2 classificados.`,
       rows: [],
     };
   }
+  if (partial && openGroups.length === standingsByGroup.length) {
+    return {
+      label: "Aguardando grupos",
+      reason: "Nenhum grupo fechado ainda — não há classificado para adiantar.",
+      rows: [],
+    };
+  }
+  // Daqui em diante a chave sai mesmo com grupo em andamento: as vagas desses
+  // grupos entram como placeholder e são preenchidas depois.
+  const note = partial
+    ? `${openGroups.map((g) => g.group).join(", ")} ainda em andamento: essas vagas entram como ` +
+      `“A definir” e são preenchidas automaticamente depois, em “Preencher vagas definidas”.`
+    : null;
 
-  const seed = (groupIndex: number, position: 0 | 1) => {
+  const seed = (groupIndex: number, position: 0 | 1): TeamSlot => {
     const g = standingsByGroup[groupIndex];
-    return slotFromStanding(g.standings[position], g.groupMatches, `${position + 1}º G${groupIndex + 1}`);
+    if (!isClosed(g)) return pendingSlot(g.group, position);
+    return slotFromStanding(g.standings[position], g.groupMatches, `${position + 1}º ${g.group}`);
   };
 
   if (groups.length === 1) {
     return {
       label: "Final direta",
       reason: null,
+      partial,
+      note,
       rows: [{ phase: "Final", round: "Final", teamA: seed(0, 0), teamB: seed(0, 1) }],
     };
   }
@@ -417,6 +549,8 @@ export function buildInitialKnockoutPlan(categoryName: string, matches: Match[],
     return {
       label: "Semifinais",
       reason: null,
+      partial,
+      note,
       rows: [
         { phase: "Semifinal", round: "Semifinal 1", teamA: seed(0, 0), teamB: seed(1, 1) },
         { phase: "Semifinal", round: "Semifinal 2", teamA: seed(1, 0), teamB: seed(0, 1) },
@@ -427,6 +561,8 @@ export function buildInitialKnockoutPlan(categoryName: string, matches: Match[],
   return {
     label: "Quartas de final",
     reason: null,
+    partial,
+    note,
     rows: [
       { phase: "Quartas de final", round: "Quartas 1", teamA: seed(0, 0), teamB: seed(3, 1) },
       { phase: "Quartas de final", round: "Quartas 2", teamA: seed(1, 0), teamB: seed(2, 1) },
@@ -436,7 +572,77 @@ export function buildInitialKnockoutPlan(categoryName: string, matches: Match[],
   };
 }
 
-export function buildNextKnockoutPlan(categoryName: string, matches: Match[], results: Result[]): KnockoutPlan {
+// ---------------------------------------------------------------------------
+// Preenchimento das vagas em aberto — roda depois que o grupo pendente fecha.
+// ---------------------------------------------------------------------------
+export interface KnockoutFillRow {
+  match: Match;
+  side: "a" | "b";
+  seedLabel: string;
+  slot: TeamSlot;
+}
+
+export interface KnockoutFillPlan {
+  /** Vagas que já podem ser preenchidas agora. */
+  rows: KnockoutFillRow[];
+  /** Vagas que continuam em aberto (grupo ainda em andamento). */
+  waiting: string[];
+}
+
+export function buildKnockoutFillPlan(
+  categoryName: string,
+  matches: Match[],
+  results: Result[],
+): KnockoutFillPlan {
+  const categoryMatches = matches.filter((m) => m.category_name === categoryName);
+  const byGroup = new Map(groupStandings(categoryMatches, results).map((g) => [g.group, g]));
+  const rows: KnockoutFillRow[] = [];
+  const waiting: string[] = [];
+
+  // Confrontos da chave indexados por round, para resolver "Vencedor Semifinal 1".
+  const byRound = new Map(
+    categoryMatches
+      .filter((m) => isKnockoutPhase(m.group_or_phase) && m.round)
+      .map((m) => [m.round as string, m]),
+  );
+
+  const resolve = (seed: PendingSeed): TeamSlot | null => {
+    if (seed.kind === "grupo") {
+      const g = byGroup.get(seed.group);
+      if (!g || !g.allFinished || g.standings.length <= seed.position) return null;
+      return slotFromStanding(g.standings[seed.position], g.groupMatches, seed.seedLabel);
+    }
+    const source = byRound.get(seed.round);
+    if (!source || !isTerminal(source.match_status)) return null;
+    return seed.side === "vencedor"
+      ? winnerSlot(source, results, seed.seedLabel)
+      : loserSlot(source, results, seed.seedLabel);
+  };
+
+  for (const match of categoryMatches) {
+    if (!isKnockoutPhase(match.group_or_phase)) continue;
+    for (const side of ["a", "b"] as const) {
+      const name = side === "a" ? match.team_a_name : match.team_b_name;
+      const seed = parsePendingSlotName(name);
+      if (!seed) continue;
+      const slot = resolve(seed);
+      if (!slot) {
+        waiting.push(seed.seedLabel);
+        continue;
+      }
+      rows.push({ match, side, seedLabel: seed.seedLabel, slot });
+    }
+  }
+
+  return { rows, waiting: [...new Set(waiting)] };
+}
+
+export function buildNextKnockoutPlan(
+  categoryName: string,
+  matches: Match[],
+  results: Result[],
+  options: KnockoutPlanOptions = {},
+): KnockoutPlan {
   const categoryMatches = matches.filter((m) => m.category_name === categoryName);
   const quarters = orderedKnockoutMatches(categoryMatches, "Quartas de final");
   const semis = orderedKnockoutMatches(categoryMatches, "Semifinal");
@@ -464,33 +670,54 @@ export function buildNextKnockoutPlan(categoryName: string, matches: Match[], re
     };
   }
 
-  if (semis.length > 0 && (finals.length === 0 || thirdPlace.length === 0)) {
+  const wantsThirdPlace = options.thirdPlace === true;
+  const missingThirdPlace = wantsThirdPlace && thirdPlace.length === 0;
+
+  if (semis.length > 0 && (finals.length === 0 || missingThirdPlace)) {
     if (semis.length !== 2) {
       return { label: "Semifinais incompletas", reason: "A categoria tem semifinais criadas em quantidade diferente de 2.", rows: [] };
     }
-    if (!completed(semis)) {
-      return { label: "Aguardando semifinais", reason: "Finalize as semifinais para gerar final e 3º lugar.", rows: [] };
+    // Com "adiantar" ligado, a final é criada já — cada lado que ainda não tem
+    // vencedor entra como vaga em aberto ("Vencedor Semifinal 1") e é resolvido
+    // depois, automaticamente ou pelo editor de confronto do ADM.
+    if (!completed(semis) && !options.allowPartial) {
+      return {
+        label: "Aguardando semifinais",
+        reason: `Finalize as semifinais para gerar a final${wantsThirdPlace ? " e o 3º lugar" : ""}.`,
+        rows: [],
+      };
     }
-    const winners = semis.map((m, i) => winnerSlot(m, results, `Vencedor SF${i + 1}`));
-    const losers = semis.map((m, i) => loserSlot(m, results, `Perdedor SF${i + 1}`));
-    if (winners.some((w) => !w) || losers.some((l) => !l)) {
-      return { label: "Aguardando semifinais", reason: "Há semifinal finalizada sem vencedor definido.", rows: [] };
-    }
+    const winners = semis.map(
+      (m, i) => winnerSlot(m, results, `Vencedor SF${i + 1}`) ?? pendingDueloSlot(m, "vencedor"),
+    );
+    const losers = semis.map(
+      (m, i) => loserSlot(m, results, `Perdedor SF${i + 1}`) ?? pendingDueloSlot(m, "perdedor"),
+    );
     const rows: KnockoutMatchPlan[] = [];
-    if (thirdPlace.length === 0) {
-      rows.push({ phase: "Disputa de 3º lugar", round: "3º lugar", teamA: losers[0]!, teamB: losers[1]! });
+    if (missingThirdPlace) {
+      rows.push({ phase: "Disputa de 3º lugar", round: "3º lugar", teamA: losers[0], teamB: losers[1] });
     }
     if (finals.length === 0) {
-      rows.push({ phase: "Final", round: "Final", teamA: winners[0]!, teamB: winners[1]! });
+      rows.push({ phase: "Final", round: "Final", teamA: winners[0], teamB: winners[1] });
     }
-    return { label: "Final e 3º lugar", reason: null, rows };
+    const partial = rows.some((r) => r.teamA.pending || r.teamB.pending);
+    return {
+      label: wantsThirdPlace ? "Final e 3º lugar" : "Final",
+      reason: null,
+      partial,
+      note: partial
+        ? "As semifinais ainda não têm vencedor no app: esses lados entram como “A definir” e " +
+          "são preenchidos em “Preencher vagas definidas” — ou à mão em CLASS, tocando no confronto."
+        : null,
+      rows,
+    };
   }
 
   if (finals.length > 0) {
     return { label: "Chave completa", reason: "A final desta categoria já foi criada.", rows: [] };
   }
 
-  return buildInitialKnockoutPlan(categoryName, matches, results);
+  return buildInitialKnockoutPlan(categoryName, matches, results, options);
 }
 
 // ---------------------------------------------------------------------------

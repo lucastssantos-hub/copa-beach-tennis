@@ -9,6 +9,7 @@ import StatusPill from "./StatusPill";
 import {
   MIXED_LABEL,
   mixedState,
+  parsePendingSlotName,
   sideLineup,
   sideTeamName,
 } from "../lib/engine";
@@ -61,6 +62,17 @@ function SideStatus({
   const abbr =
     (side === "a" ? match.team_a_abbreviation : match.team_b_abbreviation) ||
     sideTeamName(match, side);
+
+  // Vaga de chave adiantada: não existe capitão para cobrar ainda.
+  const pending = parsePendingSlotName(side === "a" ? match.team_a_name : match.team_b_name);
+  if (pending) {
+    return (
+      <div className="space-y-1.5 rounded-xl border border-amber-300/30 bg-amber-300/10 p-2">
+        <span className="font-mono text-xs font-bold text-amber-200">{pending.seedLabel}</span>
+        <p className="text-[10px] font-bold text-cream/60">Vaga em aberto — grupo em andamento.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-1.5 rounded-xl border border-white/10 bg-white/[0.03] p-2">
