@@ -16,7 +16,7 @@ import LetzplayPanel from "../components/LetzplayPanel";
 import { useTable } from "../lib/useTable";
 import { supabase, supabaseConfigured } from "../lib/supabase";
 import { createAuditLog, createNotification } from "../lib/actions";
-import { READINESS_BUCKETS, isGroupPhase, readinessBucket, type ReadinessBucket } from "../lib/engine";
+import { READINESS_BUCKETS, isGroupPhase, parsePendingSlotName, readinessBucket, type ReadinessBucket } from "../lib/engine";
 import {
   CATEGORY_CHIPS,
   type Athlete,
@@ -369,27 +369,50 @@ function BracketMatchEditor({ match, teams, onClose, onSaved }: { match: Match; 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Cada lado pode ser preenchido sozinho: é comum um grupo fechar antes do
+  // outro (ex.: 60+ com o Grupo 1 decidido e o Grupo 2 ainda jogando). O lado
+  // não escolhido continua como estava — a vaga em aberto é preservada.
+  const seedA = parsePendingSlotName(match.team_a_name);
+  const seedB = parsePendingSlotName(match.team_b_name);
+
   async function save() {
-    const a = teams.find((team) => team.id === teamAId);
-    const b = teams.find((team) => team.id === teamBId);
-    if (!a || !b || a.id === b.id) {
-      setError("Selecione duas equipes diferentes.");
+    const a = teams.find((team) => team.id === teamAId) ?? null;
+    const b = teams.find((team) => team.id === teamBId) ?? null;
+    if (!a && !b) {
+      setError("Escolha pelo menos uma equipe.");
+      return;
+    }
+    if (a && b && a.id === b.id) {
+      setError("As duas equipes do confronto precisam ser diferentes.");
+      return;
+    }
+    // Impede colocar de um lado a equipe que já está no outro.
+    if (a && !b && match.team_b_id === a.id) {
+      setError("Essa equipe já está do outro lado do confronto.");
+      return;
+    }
+    if (b && !a && match.team_a_id === b.id) {
+      setError("Essa equipe já está do outro lado do confronto.");
       return;
     }
     if (!supabase) return setError("Supabase não configurado.");
     setSaving(true);
     setError(null);
-    const { error: err } = await supabase.from("matches").update({
-      team_a_id: a.id, team_a_name: a.team_name, team_a_abbreviation: a.abbreviation, team_a_flag: a.flag,
-      team_b_id: b.id, team_b_name: b.team_name, team_b_abbreviation: b.abbreviation, team_b_flag: b.flag,
+    const patch: Record<string, unknown> = {
       match_status: "Aguardando escalação", synced_escalacao: false, letzplay_synced_at: null,
-    }).eq("id", match.id);
+    };
+    if (a) Object.assign(patch, { team_a_id: a.id, team_a_name: a.team_name, team_a_abbreviation: a.abbreviation, team_a_flag: a.flag });
+    if (b) Object.assign(patch, { team_b_id: b.id, team_b_name: b.team_name, team_b_abbreviation: b.abbreviation, team_b_flag: b.flag });
+    const { error: err } = await supabase.from("matches").update(patch).eq("id", match.id);
     setSaving(false);
     if (err) return setError(err.message);
     // "Aguardando escalação" já libera o envio no app do capitão; a notificação
-    // é o aviso para ele não depender de abrir o app por acaso.
+    // é o aviso para ele não depender de abrir o app por acaso. Só notifica quem
+    // acabou de entrar no confronto — não repete para quem já estava lá.
     const fase = match.round ?? match.group_or_phase ?? "chave";
-    for (const equipe of [a, b]) {
+    const novos = [a, b].filter((equipe): equipe is Team =>
+      !!equipe && equipe.id !== match.team_a_id && equipe.id !== match.team_b_id);
+    for (const equipe of novos) {
       await createNotification({
         notification_type: "chave",
         message: `🔑 ${equipe.team_name} está em ${fase} (Cat. ${match.category_name}) — envie a escalação`,
@@ -398,7 +421,9 @@ function BracketMatchEditor({ match, teams, onClose, onSaved }: { match: Match; 
         match_id: match.id,
       });
     }
-    await createAuditLog({ actor: "ORG", action: "DEFINIR_CHAVE", entity: "matches", details: `${a.team_name} x ${b.team_name} — ${match.category_name} ${match.group_or_phase} ${match.round}` });
+    const nomeA = a?.team_name ?? match.team_a_name ?? "?";
+    const nomeB = b?.team_name ?? match.team_b_name ?? "?";
+    await createAuditLog({ actor: "ORG", action: "DEFINIR_CHAVE", entity: "matches", details: `${nomeA} x ${nomeB} — ${match.category_name} ${match.group_or_phase} ${match.round}` });
     onSaved();
     onClose();
   }
@@ -406,8 +431,9 @@ function BracketMatchEditor({ match, teams, onClose, onSaved }: { match: Match; 
   return <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/75 p-4 backdrop-blur-sm sm:items-center">
     <div className="w-full max-w-md space-y-4 rounded-3xl border border-white/15 bg-roxo-escuro p-5 shadow-2xl">
       <div><p className="text-[11px] font-extrabold uppercase tracking-widest text-coral">Editar confronto eliminatório</p><p className="mt-1 text-lg font-extrabold text-branco-quente">{match.group_or_phase} · {match.round}</p></div>
-      <FormSelect label="Equipe A" value={teamAId} onChange={(event) => setTeamAId(event.target.value)}><option value="">Selecione…</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.flag || "🏳️"} {team.team_name}</option>)}</FormSelect>
-      <FormSelect label="Equipe B" value={teamBId} onChange={(event) => setTeamBId(event.target.value)}><option value="">Selecione…</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.flag || "🏳️"} {team.team_name}</option>)}</FormSelect>
+      <p className="text-xs font-semibold text-cream/60">Dá para preencher um lado de cada vez. O lado deixado em branco continua como está.</p>
+      <FormSelect label={seedA ? `Equipe A — vaga: ${seedA.seedLabel}` : "Equipe A"} value={teamAId} onChange={(event) => setTeamAId(event.target.value)}><option value="">{seedA ? `Manter vaga em aberto (${seedA.seedLabel})` : "Manter como está"}</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.flag || "🏳️"} {team.team_name}</option>)}</FormSelect>
+      <FormSelect label={seedB ? `Equipe B — vaga: ${seedB.seedLabel}` : "Equipe B"} value={teamBId} onChange={(event) => setTeamBId(event.target.value)}><option value="">{seedB ? `Manter vaga em aberto (${seedB.seedLabel})` : "Manter como está"}</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.flag || "🏳️"} {team.team_name}</option>)}</FormSelect>
       {error && <p className="text-sm font-bold text-coral">{error}</p>}
       <div className="flex gap-2"><Button variant="ghost" className="flex-1" onClick={onClose}>Cancelar</Button><Button className="flex-1" disabled={saving} onClick={save}>{saving ? "Salvando…" : "Liberar escalação"}</Button></div>
     </div>
