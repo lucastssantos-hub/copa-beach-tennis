@@ -9,6 +9,27 @@ REPO="${REPO:-copa-capitao}"
 HERE="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$HERE"
 
+# ---------------------------------------------------------------------------
+# TRAVA DE SEGURANÇA (27/08/2026)
+# Este script builda APP=capitao, que o vite.config.js aponta para
+# legacy-capitao.html -> src/main.capitao.jsx, ou seja, o app LEGADO.
+# Mas o site publicado em github.io/copa-capitao/ é o app REACT novo
+# (contém verify_captain_login, react-router, "Dupla feminina" e CSS;
+# o build legado não tem nada disso e sai 231 kB contra 434 kB).
+# Como o último passo é `git push -f`, rodar isto hoje SUBSTITUI o app dos
+# capitães pelo legado, sem CSS e com outro login — no meio do evento.
+# Conserto pendente: apontar APP=capitao para index.html (src/main.tsx) com
+# base /copa-capitao/ e uma rota "/" que caia direto na tela do Capitão.
+# Até lá, use https://lucastssantos-hub.github.io/copa-beach-tennis/capitao/
+# ---------------------------------------------------------------------------
+if [ "${ALLOW_LEGACY_CAPITAO_DEPLOY:-}" != "1" ]; then
+  echo "✋ ABORTADO: este script publicaria o app LEGADO do capitão por cima do app React que está no ar." >&2
+  echo "   Veja o bloco 'TRAVA DE SEGURANÇA' neste arquivo e a seção 2 do DEPLOY.md." >&2
+  echo "   Se você já corrigiu o vite.config.js e sabe o que está fazendo:" >&2
+  echo "     ALLOW_LEGACY_CAPITAO_DEPLOY=1 npm run deploy:capitao" >&2
+  exit 1
+fi
+
 echo "▶ Build do app do Capitão (base /$REPO/)…"
 npm run build:capitao
 touch dist-capitao/.nojekyll

@@ -27,15 +27,39 @@ git push origin main
 ```
 O Actions builda (`npm run build` → `dist`, base `/copa-beach-tennis/`) e publica.
 
-## 2) Publicar o Capitão (link separado)
-Um comando cria o repo `copa-capitao` e publica:
+## 2) Publicar o Capitão (link separado) — ⚠️ QUEBRADO, NÃO RODE
 
-```bash
-npm run deploy:capitao
-```
-(Build `APP=capitao` → `dist-capitao` com base `/copa-capitao/`, push para a branch `gh-pages` e ativa o Pages.)
+`npm run deploy:capitao` está **travado de propósito** (27/08/2026). Ele publicaria
+o app **errado** por cima do que os capitães usam.
 
-Para republicar depois de mudanças, rode o mesmo comando.
+**O que aconteceu:** `vite.config.js` faz `APP=capitao` buildar `legacy-capitao.html`
+→ `src/main.capitao.jsx` → `captainApp.jsx`, o app **legado**. Mas o site que está no
+ar em `copa-capitao` é o app **React** (`src/main.tsx` → `src/pages/Capitao.tsx`).
+Comparação dos bundles:
+
+| Marcador | Build de `APP=capitao` | Publicado em copa-capitao |
+|---|---|---|
+| `verify_captain_login` (login atual) | ✗ | ✓ |
+| `react-router` | ✗ | ✓ |
+| `Dupla feminina` (tela atual) | ✗ | ✓ |
+| arquivo CSS | ✗ nenhum | ✓ |
+| tamanho | 231 kB | 434 kB |
+
+Como o script termina em `git push -f`, rodá-lo troca o app dos capitães pelo legado,
+sem CSS e com outro login. A trava está em `scripts/deploy-capitao.sh`.
+
+**Enquanto não for consertado**, o link do capitão é a rota dentro do app da
+organização, que sai no deploy normal do passo 1 e está sempre atualizada:
+
+    https://lucastssantos-hub.github.io/copa-beach-tennis/capitao/
+
+**Conserto pendente:** apontar `APP=capitao` para `index.html` (`src/main.tsx`) com
+base `/copa-capitao/`, e fazer a rota `/` cair direto na tela do Capitão (hoje o
+catch-all do `main.tsx` renderiza `Home`). Depois de testado, remover a trava.
+
+O bundle publicado hoje em `copa-capitao` também está algumas versões atrás — não
+contém `athlete_registrations`, então é anterior a "Restringe escalação por equipe
+e categoria".
 
 ## 3) Zerar os dados para o evento real
 A primeira vez, o estado no Supabase pode conter dados de teste. Para começar limpo:
