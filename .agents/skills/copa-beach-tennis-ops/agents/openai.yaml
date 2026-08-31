@@ -1,0 +1,4 @@
+interface:
+  display_name: "Operação Copa Beach Tennis"
+  short_description: "Gerencia etapas, chaves, elencos e publicação do app da Copa."
+  default_prompt: "Use $copa-beach-tennis-ops para operar uma etapa da Copa do Mundo de Beach Tennis."
